@@ -1,0 +1,192 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+    
+    function isValidId(id) { 
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); 
+    }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isSignedIn() { return request.auth != null; }
+    function isAdmin() { 
+      return isSignedIn() && (
+        request.auth.token.email == 'aburayhan10x@gmail.com' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) 
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+      ); 
+    }
+
+    match /users/{userId} {
+      function isValidUser(data) {
+        return data.keys().hasAll(['email', 'role', 'createdAt'])
+            && data.keys().size() <= 5
+            && data.email is string && data.email.size() <= 200
+            && data.role is string && (data.role == 'user' || data.role == 'admin')
+            && data.createdAt is timestamp;
+      }
+      
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      // Only system creates users securely, or allow user to create profile with 'user' role
+      allow create: if isSignedIn() 
+                    && request.auth.uid == userId 
+                    && isValidUser(incoming())
+                    && incoming().role == 'user'
+                    && incoming().createdAt == request.time;
+      allow update: if isSignedIn() 
+                    && (request.auth.uid == userId || isAdmin())
+                    && isValidUser(incoming())
+                    && (isAdmin() || incoming().role == existing().role)
+                    && incoming().createdAt == existing().createdAt;
+    }
+
+    match /bookings/{bookingId} {
+      function isValidBooking(data) {
+        return data.keys().hasAll(['userId', 'flightId', 'status', 'totalAmount'])
+            && data.userId is string && data.userId.size() <= 128
+            && data.flightId is string && data.flightId.size() <= 128
+            && data.status is string && (data.status == 'PENDING' || data.status == 'CONFIRMED' || data.status == 'CANCELLED')
+            && data.totalAmount is number;
+      }
+
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow update: if isSignedIn() && (
+        isAdmin() || 
+        (
+          resource.data.userId == request.auth.uid 
+          && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])
+          && incoming().status == 'CANCELLED'
+          && incoming().updatedAt == request.time
+        )
+      );
+      allow create: if isSignedIn() 
+                    && isValidBooking(incoming())
+                    && incoming().userId == request.auth.uid
+                    && incoming().status == 'PENDING'
+                    && (incoming().createdAt == request.time || !('createdAt' in incoming()));
+    }
+    
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /hotelOffers/{hotelId} {
+       function isValidHotel(data) {
+           return data.keys().hasAll(['title', 'description', 'price', 'location'])
+               && data.title is string && data.title.size() <= 200
+               && data.description is string && data.description.size() <= 5000
+               && data.price is number
+               && data.location is string && data.location.size() <= 200;
+       }
+       allow read: if true;
+       allow create, update: if isAdmin() && isValidHotel(incoming());
+       allow delete: if isAdmin();
+    }
+
+    match /holidayPackages/{packageId} {
+       function isValidPackage(data) {
+           return data.keys().hasAll(['title', 'description', 'price', 'duration', 'location'])
+               && data.title is string && data.title.size() <= 200
+               && data.description is string && data.description.size() <= 5000
+               && data.price is number
+               && data.duration is string && data.duration.size() <= 100
+               && data.location is string && data.location.size() <= 200;
+       }
+       allow read: if true;
+       allow create, update: if isAdmin() && isValidPackage(incoming());
+       allow delete: if isAdmin();
+    }
+
+    match /visaServices/{visaId} {
+       function isValidVisa(data) {
+           return data.keys().hasAll(['country', 'description', 'price', 'processingTime'])
+               && data.country is string && data.country.size() <= 100
+               && data.description is string && data.description.size() <= 5000
+               && data.price is number
+               && data.processingTime is string && data.processingTime.size() <= 100;
+       }
+       allow read: if true;
+       allow create, update: if isAdmin() && isValidVisa(incoming());
+       allow delete: if isAdmin();
+    }
+
+    match /pages/{pageId} {
+       function isValidPage(data) {
+           return data.keys().hasAll(['title', 'content'])
+               && data.title is string && data.title.size() <= 200
+               && data.content is string && data.content.size() <= 100000;
+       }
+       allow read: if true;
+       allow create, update: if isAdmin() && isValidPage(incoming());
+       allow delete: if isAdmin();
+    }
+
+    match /jobs/{jobId} {
+       function isValidJob(data) {
+           return data.keys().hasAll(['title', 'location', 'jobType', 'description'])
+               && data.title is string && data.title.size() <= 200
+               && data.location is string && data.location.size() <= 100
+               && data.jobType is string && data.jobType.size() <= 100
+               && data.description is string && data.description.size() <= 50000;
+       }
+       allow read: if true;
+       allow create, update: if isAdmin() && isValidJob(incoming());
+       allow delete: if isAdmin();
+    }
+
+    match /pressReleases/{pressId} {
+       function isValidPress(data) {
+           return data.keys().hasAll(['title', 'date', 'link', 'publisher'])
+               && data.title is string && data.title.size() <= 200
+               && data.date is string && data.date.size() <= 100
+               && data.link is string && data.link.size() <= 500
+               && data.publisher is string && data.publisher.size() <= 200;
+       }
+       allow read: if true;
+       allow create, update: if isAdmin() && isValidPress(incoming());
+       allow delete: if isAdmin();
+    }
+
+    match /blogPosts/{postId} {
+       function isValidPost(data) {
+           return data.keys().hasAll(['title', 'author', 'content', 'date'])
+               && data.title is string && data.title.size() <= 200
+               && data.author is string && data.author.size() <= 100
+               && data.content is string && data.content.size() <= 100000
+               && data.date is string && data.date.size() <= 100;
+       }
+       allow read: if true;
+       allow create, update: if isAdmin() && isValidPost(incoming());
+       allow delete: if isAdmin();
+    }
+
+    match /destinations/{destId} {
+       function isValidDestination(data) {
+           return data.keys().hasAll(['city', 'country', 'price'])
+               && data.city is string && data.city.size() <= 200
+               && data.country is string && data.country.size() <= 200
+               && data.price is string && data.price.size() <= 200;
+       }
+       allow read: if true;
+       allow create, update: if isAdmin() && isValidDestination(incoming());
+       allow delete: if isAdmin();
+    }
+
+    match /adminFlights/{flightId} {
+       function isValidAdminFlight(data) {
+           return data.keys().hasAll(['origin', 'destination', 'price', 'airline', 'flightNumber'])
+               && data.origin is string && data.origin.size() <= 10
+               && data.destination is string && data.destination.size() <= 10
+               && data.price is number
+               && data.airline is string && data.airline.size() <= 100
+               && data.flightNumber is string && data.flightNumber.size() <= 100;
+       }
+       allow read: if true;
+       allow create, update: if isAdmin() && isValidAdminFlight(incoming());
+       allow delete: if isAdmin();
+    }
+  }
+}

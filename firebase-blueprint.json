@@ -1,0 +1,174 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A user profile in the application.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "firstName": { "type": "string" },
+        "lastName": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "admin"] },
+        "createdAt": { "type": "number", "description": "Timestamp" }
+      },
+      "required": ["email", "role", "createdAt"]
+    },
+    "Booking": {
+      "title": "Booking",
+      "description": "A flight or hotel booking.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "flightId": { "type": "string" },
+        "passenger": {
+          "type": "object",
+          "properties": {
+            "firstName": { "type": "string" },
+            "lastName": { "type": "string" },
+            "email": { "type": "string" },
+            "phone": { "type": "string" }
+          }
+        },
+        "status": { "type": "string", "enum": ["PENDING", "CONFIRMED", "CANCELLED"] },
+        "totalAmount": { "type": "number" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["userId", "flightId", "status", "totalAmount"]
+    },
+    "Settings": {
+      "title": "Settings",
+      "description": "Global application settings.",
+      "type": "object",
+      "properties": {
+        "logoUrl": { "type": "string" },
+        "updatedAt": { "type": "number" }
+      }
+    },
+    "HotelOffer": {
+      "title": "HotelOffer",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "price": { "type": "number" },
+        "location": { "type": "string" },
+        "stars": { "type": "number" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["title", "description", "price", "location"]
+    },
+    "HolidayPackage": {
+      "title": "HolidayPackage",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "price": { "type": "number" },
+        "duration": { "type": "string" },
+        "location": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["title", "description", "price", "duration", "location"]
+    },
+    "VisaService": {
+      "title": "VisaService",
+      "type": "object",
+      "properties": {
+        "country": { "type": "string" },
+        "description": { "type": "string" },
+        "price": { "type": "number" },
+        "processingTime": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["country", "description", "price", "processingTime"]
+    }
+    "PageData": {
+      "title": "PageData",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["title", "content"]
+    },
+    "Job": {
+      "title": "Job",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "location": { "type": "string" },
+        "jobType": { "type": "string" },
+        "description": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["title", "location", "jobType", "description"]
+    },
+    "PressRelease": {
+      "title": "PressRelease",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "date": { "type": "string" },
+        "link": { "type": "string" },
+        "publisher": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["title", "date", "link", "publisher"]
+    },
+    "BlogPost": {
+      "title": "BlogPost",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "author": { "type": "string" },
+        "excerpt": { "type": "string" },
+        "content": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "date": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["title", "author", "content", "date"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profiles"
+    },
+    "/bookings/{bookingId}": {
+      "schema": { "$ref": "#/entities/Booking" },
+      "description": "User bookings"
+    },
+    "/settings/{settingId}": {
+      "schema": { "$ref": "#/entities/Settings" },
+      "description": "Global settings like logoUrl"
+    },
+    "/hotelOffers/{hotelId}": {
+      "schema": { "$ref": "#/entities/HotelOffer" }
+    },
+    "/holidayPackages/{packageId}": {
+      "schema": { "$ref": "#/entities/HolidayPackage" }
+    },
+    "/visaServices/{visaId}": {
+      "schema": { "$ref": "#/entities/VisaService" }
+    },
+    "/pages/{pageId}": {
+      "schema": { "$ref": "#/entities/PageData" }
+    },
+    "/jobs/{jobId}": {
+      "schema": { "$ref": "#/entities/Job" }
+    },
+    "/pressReleases/{pressId}": {
+      "schema": { "$ref": "#/entities/PressRelease" }
+    },
+    "/blogPosts/{postId}": {
+      "schema": { "$ref": "#/entities/BlogPost" }
+    }
+  }
+}
