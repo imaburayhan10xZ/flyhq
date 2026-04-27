@@ -22,8 +22,22 @@ interface AdminDashboardProps {
 type TabType = 'overview' | 'bookings' | 'flights' | 'destinations' | 'hotels' | 'holidays' | 'visa' | 'pages' | 'careers' | 'press' | 'blog' | 'users' | 'settings' | 'support_channels';
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLogo }) => {
-  const { user, isAdmin, loading, signInWithGoogle, logout } = useAuth();
+  const { user, isAdmin, loading, signInWithGoogle, signInWithEmail, logout } = useAuth();
   const navigate = useNavigate();
+
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [authError, setAuthError] = useState('');
+
+  const handleEmailSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError('');
+    try {
+      await signInWithEmail(email, password);
+    } catch (err: any) {
+      setAuthError(err.message || 'Failed to sign in');
+    }
+  };
 
   const handleLogout = async () => {
       try {
@@ -233,9 +247,37 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
             {user ? (
                <button onClick={handleLogout} className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 px-4 rounded-xl transition">Sign Out</button>
             ) : (
-               <button onClick={signInWithGoogle} className="w-full bg-primary hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl transition flex items-center justify-center shadow-lg shadow-blue-500/30">
-                  <LogIn className="w-5 h-5 mr-2" /> Sign In with Google
-               </button>
+                <div className="w-full">
+                    <form onSubmit={handleEmailSignIn} className="flex flex-col gap-4 mb-6">
+                        <input
+                            type="email"
+                            placeholder="Email address"
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            required
+                        />
+                        <input
+                            type="password"
+                            placeholder="Password"
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            required
+                        />
+                        {authError && <p className="text-red-500 text-sm font-medium">{authError}</p>}
+                        <button type="submit" className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 px-4 rounded-xl transition">
+                            Sign In / Sign Up
+                        </button>
+                    </form>
+                    <div className="relative flex items-center justify-center mb-6">
+                        <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200"></div></div>
+                        <div className="relative bg-white px-4 text-sm text-slate-500 rounded-full font-medium">or continue with</div>
+                    </div>
+                    <button onClick={signInWithGoogle} className="w-full bg-primary hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl transition flex items-center justify-center shadow-lg shadow-blue-500/30">
+                        <LogIn className="w-5 h-5 mr-2" /> Sign In with Google
+                    </button>
+                </div>
             )}
         </div>
       </div>

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from 'firebase/auth';
+import { User, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth, db } from '../firebase';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 
@@ -8,6 +8,7 @@ interface AuthContextType {
   isAdmin: boolean;
   loading: boolean;
   signInWithGoogle: () => Promise<void>;
+  signInWithEmail: (email: string, pass: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -54,10 +55,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await signInWithPopup(auth, provider);
   };
 
+  const signInWithEmail = async (email: string, pass: string) => {
+    try {
+        await signInWithEmailAndPassword(auth, email, pass);
+    } catch (error: any) {
+        if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+            await createUserWithEmailAndPassword(auth, email, pass);
+        } else {
+            throw error;
+        }
+    }
+  };
+
   const logout = () => signOut(auth);
 
   return (
-    <AuthContext.Provider value={{ user, isAdmin, loading, signInWithGoogle, logout }}>
+    <AuthContext.Provider value={{ user, isAdmin, loading, signInWithGoogle, signInWithEmail, logout }}>
       {!loading && children}
     </AuthContext.Provider>
   );
