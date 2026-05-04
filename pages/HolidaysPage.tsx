@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Palmtree, MapPin, Calendar, Loader2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { getHolidayPackages } from '../services/firebaseService';
 
 const HolidaysPage: React.FC = () => {
+  const navigate = useNavigate();
   const [packages, setPackages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -77,7 +79,7 @@ const HolidaysPage: React.FC = () => {
                                 <span className="text-2xl font-black text-green-700">${pkg.price}</span>
                                 <span className="text-sm text-slate-500 font-medium whitespace-nowrap ml-1 block sm:inline">/person</span>
                             </div>
-                            <button className="bg-green-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-green-700 transition shadow-md hover:shadow-lg">
+                            <button onClick={() => { window.scrollTo(0,0); navigate(`/holidays/${pkg.id}`); }} className="bg-green-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-green-700 transition shadow-md hover:shadow-lg">
                                 View Details
                             </button>
                         </div>

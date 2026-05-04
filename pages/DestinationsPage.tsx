@@ -45,7 +45,7 @@ const DestinationsPage: React.FC = () => {
                                         <div className="text-sm font-medium text-slate-500">Starting from</div>
                                         <div className="text-lg font-bold text-primary">{dest.price}</div>
                                     </div>
-                                    <Link to={`/search`} className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-colors">
+                                    <Link to={`/destination-consultation/${dest.id}`} className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-primary hover:bg-primary hover:text-white transition-colors" title="Request Booking">
                                         <ArrowRight className="w-5 h-5" />
                                     </Link>
                                 </div>

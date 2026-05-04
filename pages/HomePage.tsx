@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { SearchParams, Airport, FlightClass, TripType, HotelSearchParams } from '../types';
-import { AIRPORTS } from '../services/mockApi';
-import { Search, Calendar, MapPin, Sparkles, TrendingUp, ShieldCheck, Phone, BedDouble, Plane, Star, ArrowRight, Map, Globe2, Quote, AlertCircle } from 'lucide-react';
+import { Search, Calendar, MapPin, Sparkles, TrendingUp, ShieldCheck, Phone, BedDouble, Plane, Star, ArrowRight, Map, Globe2, Quote, AlertCircle, User } from 'lucide-react';
 import { getDestinations, getBlogPosts } from '../services/firebaseService';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { BlogReaderModal } from '../components/BlogReaderModal';
 import { FeaturesContext } from '../context/FeaturesContext';
 
@@ -24,6 +23,184 @@ const PARTNERS = [
   { name: "Biman Bangladesh", logo: "BG" }, { name: "US-Bangla", logo: "BS" }, { name: "Novoair", logo: "VQ" }
 ];
 
+const AirportSelector = ({ label, value, onChange, placeholder, airports }: any) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  const selectedAirport = airports.find((a: any) => a.code === value);
+  const displayValue = selectedAirport ? `${selectedAirport.city} (${selectedAirport.code})` : value;
+
+  const filtered = airports.filter((a: any) => 
+    a.code.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    a.city.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    a.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    a.country.toLowerCase().includes(searchTerm.toLowerCase())
+  ).slice(0, 30); // limit for performance
+
+  return (
+    <div className="relative p-3 hover:bg-slate-50 transition-colors group bg-white h-[80px] flex flex-col justify-center cursor-pointer rounded-xl" onClick={() => setIsOpen(true)}>
+      <label className="text-[12px] font-bold text-slate-500 block mb-1">{label}</label>
+      <div className="flex items-center">
+        <MapPin className="w-5 h-5 text-slate-400 mr-2" />
+        <span className="font-bold text-lg md:text-xl text-slate-900 truncate">
+          {displayValue || placeholder}
+        </span>
+      </div>
+
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            className="absolute top-full left-0 w-full sm:w-[400px] mt-2 bg-white rounded-xl shadow-2xl border border-slate-100 overflow-hidden z-50 text-left"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="p-3 border-b border-slate-100">
+               <input 
+                  type="text"
+                  autoFocus
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 outline-none focus:border-primary focus:ring-1 focus:ring-primary text-sm font-medium"
+                  placeholder="Type airport name, code, city or country"
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+               />
+            </div>
+            <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
+               {filtered.length === 0 ? (
+                 <div className="p-6 text-center text-slate-500 text-sm font-medium">No airports found.</div>
+               ) : (
+                 filtered.map((a: any) => (
+                   <div 
+                     key={a.code}
+                     className="px-4 py-3 hover:bg-slate-50 cursor-pointer flex items-center justify-between border-b border-slate-50/50 last:border-0 transition-colors"
+                     onClick={() => {
+                        onChange(a.code);
+                        setIsOpen(false);
+                        setSearchTerm('');
+                     }}
+                   >
+                      <div className="flex items-center overflow-hidden pr-3">
+                         <Plane className="w-4 h-4 text-slate-400 mr-3 shrink-0" />
+                         <div className="overflow-hidden flex-1">
+                           <p className="font-bold text-slate-800 text-sm truncate">{a.name || `${a.city} Airport`}</p>
+                           <p className="text-[11px] text-slate-500 truncate mt-0.5">{a.city}, {a.country}</p>
+                         </div>
+                      </div>
+                      <span className="font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded text-xs shrink-0">{a.code}</span>
+                   </div>
+                 ))
+               )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      
+      {/* Background overlay to close */}
+      {isOpen && (
+         <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setIsOpen(false); }}></div>
+      )}
+    </div>
+  );
+};
+
+const PassengerSelector = ({ adults, setAdults, child, setChild, infant, setInfant, flightClass, setFlightClass }: any) => {
+  const [isOpen, setIsOpen] = useState(false);
+  
+  const total = adults + child + infant;
+
+  return (
+    <div className="relative border border-slate-300 rounded-xl p-3 hover:border-primary transition-colors group bg-white shadow-sm h-[80px] flex flex-col justify-center cursor-pointer" onClick={() => setIsOpen(true)}>
+      <label className="text-[12px] font-bold text-slate-500 block mb-1">Passenger, Class</label>
+      <div className="flex items-center">
+        <User className="w-5 h-5 text-slate-400 mr-2" />
+        <div className="flex flex-col">
+          <span className="font-bold text-lg text-slate-900 truncate">
+            {total} Traveler{total > 1 ? 's' : ''}
+          </span>
+          <span className="text-xs text-slate-500 font-medium">{flightClass}</span>
+        </div>
+      </div>
+
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            className="absolute top-full right-0 w-[320px] mt-2 bg-white rounded-xl shadow-xl border border-slate-200 overflow-hidden z-50 text-left p-5"
+            onClick={e => e.stopPropagation()}
+          >
+            <h4 className="font-bold text-slate-700 pb-3 border-b border-slate-100 mb-4">Travelers</h4>
+            
+            <div className="space-y-4 mb-6">
+               <div>
+                 <div className="flex justify-between mb-2">
+                    <span className="font-bold text-sm text-slate-800">Adult</span>
+                    <span className="text-xs text-slate-400">(12 Years And Above)</span>
+                 </div>
+                 <div className="flex gap-1 flex-wrap">
+                    {[1,2,3,4,5,6,7,8,9].map(n => (
+                        <button key={n} onClick={() => setAdults(n)} className={`w-8 h-8 rounded text-sm font-bold flex items-center justify-center transition-colors ${adults === n ? 'bg-primary text-white' : 'bg-slate-50 text-slate-600 hover:bg-slate-200'}`}>
+                           {n}
+                        </button>
+                    ))}
+                 </div>
+               </div>
+
+               <div>
+                 <div className="flex justify-between mb-2">
+                    <span className="font-bold text-sm text-slate-800">Child</span>
+                    <span className="text-xs text-slate-400">(2 Years - Under 12)</span>
+                 </div>
+                 <div className="flex gap-1 flex-wrap">
+                    {[0,1,2,3,4,5,6].map(n => (
+                        <button key={n} onClick={() => setChild(n)} className={`w-8 h-8 rounded text-sm font-bold flex items-center justify-center transition-colors ${child === n ? 'bg-primary text-white' : 'bg-slate-50 text-slate-600 hover:bg-slate-200'}`}>
+                           {n}
+                        </button>
+                    ))}
+                 </div>
+               </div>
+
+               <div>
+                 <div className="flex justify-between mb-2">
+                    <span className="font-bold text-sm text-slate-800">Infant</span>
+                    <span className="text-xs text-slate-400">(Below 2 Years)</span>
+                 </div>
+                 <div className="flex gap-1 flex-wrap">
+                    {[0,1].map(n => (
+                        <button key={n} onClick={() => setInfant(n)} className={`w-8 h-8 rounded text-sm font-bold flex items-center justify-center transition-colors ${infant === n ? 'bg-primary text-white' : 'bg-slate-50 text-slate-600 hover:bg-slate-200'}`}>
+                           {n}
+                        </button>
+                    ))}
+                 </div>
+               </div>
+            </div>
+
+            <h4 className="font-bold text-slate-700 pb-3 border-b border-slate-100 mb-3">Booking Class</h4>
+            <div className="flex gap-2 flex-wrap mb-5">
+                {[FlightClass.ECONOMY, FlightClass.PREMIUM_ECONOMY, FlightClass.BUSINESS, FlightClass.FIRST].map(cls => (
+                   <button key={cls} onClick={() => setFlightClass(cls)} className={`px-3 py-1.5 rounded text-sm font-bold transition-colors ${flightClass === cls ? 'bg-primary text-white' : 'bg-slate-50 text-slate-600 hover:bg-slate-200'}`}>
+                      {cls}
+                   </button>
+                ))}
+            </div>
+
+            <button onClick={() => setIsOpen(false)} className="w-full bg-primary hover:bg-blue-700 text-white font-bold py-2.5 rounded-lg transition-colors">
+               Done
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      
+      {/* Background overlay to close */}
+      {isOpen && (
+         <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setIsOpen(false); }}></div>
+      )}
+    </div>
+  );
+};
+
 const HomePage: React.FC<HomePageProps> = ({ onSearch, onHotelSearch }) => {
   const navigate = useNavigate();
   const features = useContext(FeaturesContext);
@@ -35,8 +212,17 @@ const HomePage: React.FC<HomePageProps> = ({ onSearch, onHotelSearch }) => {
   // Blog State
   const [blogs, setBlogs] = useState<any[]>([]);
   const [selectedBlog, setSelectedBlog] = useState<any>(null);
+  
+  // Airports List State
+  const [airportsList, setAirportsList] = useState<any[]>([]);
 
   useEffect(() => {
+    // Fetch real airports list
+    fetch('/airports.json')
+      .then(res => res.json())
+      .then(data => setAirportsList(data))
+      .catch(err => console.error("Could not fetch airports list", err));
+
     getDestinations().then(data => {
       if (data) {
         setDestinations(data);
@@ -57,9 +243,19 @@ const HomePage: React.FC<HomePageProps> = ({ onSearch, onHotelSearch }) => {
   const [to, setTo] = useState('CXB');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [returnDate, setReturnDate] = useState('');
-  const [passengers, setPassengers] = useState(1);
+  
+  const [adults, setAdults] = useState(1);
+  const [child, setChild] = useState(0);
+  const [infant, setInfant] = useState(0);
+  
   const [tripType, setTripType] = useState<TripType>(TripType.ONE_WAY);
   const [flightClass, setFlightClass] = useState<FlightClass>(FlightClass.ECONOMY);
+  const [fareType, setFareType] = useState('Regular Fare');
+  const [comboFare, setComboFare] = useState(false);
+  const [multiCityFlights, setMultiCityFlights] = useState([
+    { from: 'DAC', to: 'CXB', date: new Date().toISOString().split('T')[0] },
+    { from: 'CXB', to: 'DAC', date: new Date(Date.now() + 86400000).toISOString().split('T')[0] }
+  ]);
 
   const swapLocations = () => {
     setFrom(to);
@@ -77,7 +273,7 @@ const HomePage: React.FC<HomePageProps> = ({ onSearch, onHotelSearch }) => {
       from,
       to,
       date,
-      passengers,
+      passengers: adults + child + infant,
       class: flightClass,
       tripType
     });
@@ -133,9 +329,9 @@ const HomePage: React.FC<HomePageProps> = ({ onSearch, onHotelSearch }) => {
         transition={{ duration: 0.8, delay: 0.2 }}
         className="max-w-6xl mx-auto px-4 -mt-40 relative z-20"
       >
-        <div className="bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-100">
+        <div className="bg-white rounded-2xl shadow-2xl border border-slate-100">
             {/* Tabs */}
-            <div className="flex border-b bg-slate-50">
+            <div className="flex border-b bg-slate-50 rounded-t-2xl overflow-hidden">
                 {features.flightsEnabled && (
                     <button 
                         onClick={() => setActiveTab('flights')}
@@ -165,125 +361,287 @@ const HomePage: React.FC<HomePageProps> = ({ onSearch, onHotelSearch }) => {
                         </div>
                     ) : (
                         <>
-                            <div className="flex flex-wrap items-center justify-between space-y-4 md:space-y-0 mb-8 border-b pb-4">
+                            <div className="flex flex-wrap items-center justify-between space-y-4 md:space-y-0 mb-6">
                                 <div className="flex space-x-6">
-                                    <label className={`flex items-center space-x-2 cursor-pointer font-bold transition ${tripType === TripType.ONE_WAY ? 'text-primary' : 'text-slate-500 hover:text-primary'}`}>
-                                        <input type="radio" name="trip" checked={tripType === TripType.ONE_WAY} onChange={() => setTripType(TripType.ONE_WAY)} className="text-primary w-4 h-4" />
+                                    <div className={`flex items-center space-x-2 cursor-pointer font-bold transition ${tripType === TripType.ONE_WAY ? 'text-primary' : 'text-slate-500 hover:text-primary'}`} onClick={() => setTripType(TripType.ONE_WAY)}>
+                                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${tripType === TripType.ONE_WAY ? 'border-primary' : 'border-slate-300'}`}>
+                                            {tripType === TripType.ONE_WAY && <div className="w-2.5 h-2.5 bg-primary rounded-full"></div>}
+                                        </div>
                                         <span>One Way</span>
-                                    </label>
-                                    <label className={`flex items-center space-x-2 cursor-pointer font-bold transition ${tripType === TripType.ROUND_TRIP ? 'text-primary' : 'text-slate-500 hover:text-primary'}`}>
-                                        <input type="radio" name="trip" checked={tripType === TripType.ROUND_TRIP} onChange={() => setTripType(TripType.ROUND_TRIP)} className="text-primary w-4 h-4" />
+                                    </div>
+                                    <div className={`flex items-center space-x-2 cursor-pointer font-bold transition ${tripType === TripType.ROUND_TRIP ? 'text-primary' : 'text-slate-500 hover:text-primary'}`} onClick={() => setTripType(TripType.ROUND_TRIP)}>
+                                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${tripType === TripType.ROUND_TRIP ? 'border-primary' : 'border-slate-300'}`}>
+                                            {tripType === TripType.ROUND_TRIP && <div className="w-2.5 h-2.5 bg-primary rounded-full"></div>}
+                                        </div>
                                         <span>Round Trip</span>
-                                    </label>
-                                    <label className={`flex items-center space-x-2 cursor-pointer font-bold transition ${tripType === TripType.MULTI_CITY ? 'text-primary' : 'text-slate-500 hover:text-primary'}`}>
-                                        <input type="radio" name="trip" checked={tripType === TripType.MULTI_CITY} onChange={() => setTripType(TripType.MULTI_CITY)} className="text-primary w-4 h-4" />
-                                        <span>Multi-City</span>
-                                    </label>
+                                    </div>
+                                    <div className={`flex items-center space-x-2 cursor-pointer font-bold transition ${tripType === TripType.MULTI_CITY ? 'text-primary' : 'text-slate-500 hover:text-primary'}`} onClick={() => setTripType(TripType.MULTI_CITY)}>
+                                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${tripType === TripType.MULTI_CITY ? 'border-primary' : 'border-slate-300'}`}>
+                                            {tripType === TripType.MULTI_CITY && <div className="w-2.5 h-2.5 bg-primary rounded-full"></div>}
+                                        </div>
+                                        <span>Multi City</span>
+                                    </div>
                                 </div>
-                        <div className="flex space-x-4">
-                            <select 
-                                value={passengers} 
-                                onChange={e => setPassengers(Number(e.target.value))}
-                                className="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-primary focus:border-primary block p-2.5 outline-none font-medium cursor-pointer"
-                            >
-                                {[1, 2, 3, 4, 5, 6].map(n => <option key={n} value={n}>{n} Passenger{n > 1 ? 's' : ''}</option>)}
-                            </select>
-                            <select 
-                                value={flightClass} 
-                                onChange={e => setFlightClass(e.target.value as FlightClass)}
-                                className="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-primary focus:border-primary block p-2.5 outline-none font-medium cursor-pointer"
-                            >
-                                <option value={FlightClass.ECONOMY}>Economy</option>
-                                <option value={FlightClass.BUSINESS}>Business</option>
-                                <option value={FlightClass.FIRST}>First Class</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-2 relative">
-                        {/* Locations (From/To) */}
-                        <div className="lg:col-span-5 grid grid-cols-1 md:grid-cols-2 gap-2 relative">
-                            <div className="relative border border-slate-300 rounded-xl p-3 hover:border-primary transition-colors focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 group bg-white shadow-sm h-[72px] flex flex-col justify-center">
-                                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block group-focus-within:text-primary">Leaving From</label>
-                                <div className="flex items-center">
-                                    <select 
-                                      className="w-full bg-transparent font-bold text-lg md:text-xl outline-none text-slate-900 appearance-none cursor-pointer truncate"
-                                      value={from}
-                                      onChange={(e) => setFrom(e.target.value)}
-                                    >
-                                    {AIRPORTS.map(a => <option key={a.code} value={a.code}>{a.city} ({a.code})</option>)}
-                                    </select>
-                                </div>
-                            </div>
-                            
-                            {/* Swap Button */}
-                            <button 
-                                onClick={swapLocations}
-                                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 md:w-10 md:h-10 bg-white border border-slate-200 rounded-full flex items-center justify-center text-primary shadow-md hover:bg-slate-50 hover:scale-110 active:scale-95 transition-all z-10 hidden md:flex"
-                            >
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-5 h-5">
-                                    <path d="M17 4V14M17 14L13 10M17 14L21 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                    <path d="M7 20V10M7 10L3 14M7 10L11 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                </svg>
-                            </button>
-
-                            <div className="relative border border-slate-300 rounded-xl p-3 hover:border-primary transition-colors focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 group bg-white shadow-sm h-[72px] flex flex-col justify-center">
-                                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block group-focus-within:text-primary">Going To</label>
-                                <div className="flex items-center">
-                                    <select 
-                                      className="w-full bg-transparent font-bold text-lg md:text-xl outline-none text-slate-900 appearance-none cursor-pointer truncate"
-                                      value={to}
-                                      onChange={(e) => setTo(e.target.value)}
-                                    >
-                                    {AIRPORTS.filter(a => a.code !== from).map(a => <option key={a.code} value={a.code}>{a.city} ({a.code})</option>)}
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Dates */}
-                        <div className={`lg:col-span-5 grid grid-cols-1 ${tripType === TripType.ROUND_TRIP ? 'md:grid-cols-2' : 'md:grid-cols-1'} gap-2`}>
-                            <div className="border border-slate-300 rounded-xl p-3 hover:border-primary transition-colors focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 group bg-white shadow-sm h-[72px] flex flex-col justify-center">
-                                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block group-focus-within:text-primary">Journey Date</label>
-                                <div className="flex items-center">
-                                    <input 
-                                      type="date" 
-                                      className="w-full bg-transparent font-bold text-lg md:text-xl outline-none text-slate-900 cursor-pointer"
-                                      value={date}
-                                      min={new Date().toISOString().split('T')[0]}
-                                      onChange={(e) => setDate(e.target.value)}
-                                    />
-                                </div>
-                            </div>
-                            
-                            {tripType === TripType.ROUND_TRIP && (
-                                <div className="border border-slate-300 rounded-xl p-3 hover:border-primary transition-colors focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 group bg-white shadow-sm h-[72px] flex flex-col justify-center">
-                                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block group-focus-within:text-primary">Return Date</label>
-                                    <div className="flex items-center">
+                                <div className="flex space-x-4">
+                                    <div className="border border-slate-300 rounded-xl px-4 py-2 hover:border-primary transition-colors focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 bg-white shadow-sm flex flex-col justify-center min-w-[200px]">
+                                        <label className="text-[12px] font-bold text-slate-700 block -mb-0.5">Preferred Airline</label>
                                         <input 
-                                        type="date" 
-                                        className="w-full bg-transparent font-bold text-lg md:text-xl outline-none text-slate-900 cursor-pointer"
-                                        value={returnDate}
-                                        min={date}
-                                        onChange={(e) => setReturnDate(e.target.value)}
+                                            type="text" 
+                                            className="w-full bg-transparent text-sm outline-none text-slate-500 placeholder:text-slate-400"
+                                            placeholder="Example: BS, VQ, TK"
                                         />
                                     </div>
                                 </div>
-                            )}
-                        </div>
+                            </div>
 
-                        {/* Button */}
-                        <div className="lg:col-span-2">
-                            <button 
-                                onClick={handleFlightSearch}
-                                className="w-full h-full bg-primary hover:bg-blue-700 text-white font-bold text-lg rounded-xl shadow-lg shadow-primary/30 transition transform hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center min-h-[72px]"
-                            >
-                                <Search className="w-6 h-6 mr-2" />
-                                Search
-                            </button>
-                        </div>
-                    </div>
-                    </>
+                            {tripType !== TripType.MULTI_CITY ? (
+                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-2 relative mb-6">
+                                    {/* Locations (From/To) */}
+                                    <div className="lg:col-span-5 grid grid-cols-1 md:grid-cols-2 gap-0 relative border border-slate-300 rounded-xl overflow-visible shadow-sm">
+                                        <div className="flex-1 right-border md:border-r border-slate-300 last:border-0 relative">
+                                            <AirportSelector 
+                                                label="From" 
+                                                value={from} 
+                                                onChange={setFrom} 
+                                                placeholder="Select Airport" 
+                                                airports={airportsList} 
+                                            />
+                                        </div>
+                                        
+                                        {/* Swap Button */}
+                                        <button 
+                                            onClick={swapLocations}
+                                            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-blue-50 border border-blue-100 rounded-full flex items-center justify-center text-primary hover:bg-primary hover:text-white transition-all z-10 hidden md:flex"
+                                        >
+                                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-4 h-4">
+                                                <path d="M17 4V14M17 14L13 10M17 14L21 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                                <path d="M7 20V10M7 10L3 14M7 10L11 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                            </svg>
+                                        </button>
+
+                                        <div className="flex-1">
+                                            <AirportSelector 
+                                                label="To" 
+                                                value={to} 
+                                                onChange={setTo} 
+                                                placeholder="Select Airport" 
+                                                airports={airportsList} 
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Dates */}
+                                    <div className={`lg:col-span-4 flex rounded-xl border border-slate-300 shadow-sm ${tripType === TripType.ROUND_TRIP ? 'divide-x divide-slate-300' : ''}`}>
+                                        <div className="flex-1 p-3 hover:bg-slate-50 transition-colors group cursor-pointer flex flex-col justify-center">
+                                            <label className="text-[12px] font-bold text-slate-500 block mb-1">Journey</label>
+                                            <div className="flex items-center">
+                                                <input 
+                                                  type="date" 
+                                                  className="w-full bg-transparent font-bold text-sm md:text-base outline-none text-slate-900 cursor-pointer"
+                                                  value={date}
+                                                  min={new Date().toISOString().split('T')[0]}
+                                                  onChange={(e) => {
+                                                      setDate(e.target.value);
+                                                      if(tripType === TripType.ROUND_TRIP && (!returnDate || e.target.value > returnDate)) {
+                                                          setReturnDate(e.target.value);
+                                                      }
+                                                  }}
+                                                />
+                                            </div>
+                                        </div>
+                                        
+                                        {tripType === TripType.ROUND_TRIP && (
+                                            <div className="flex-1 p-3 hover:bg-slate-50 transition-colors group cursor-pointer flex flex-col justify-center">
+                                                <label className="text-[12px] font-bold text-slate-500 block mb-1">Return</label>
+                                                <div className="flex items-center">
+                                                    <input 
+                                                    type="date" 
+                                                    className="w-full bg-transparent font-bold text-sm md:text-base outline-none text-slate-900 cursor-pointer"
+                                                    value={returnDate}
+                                                    min={date}
+                                                    onChange={(e) => setReturnDate(e.target.value)}
+                                                    />
+                                                </div>
+                                            </div>
+                                        )}
+                                        {tripType === TripType.ONE_WAY && (
+                                            <div className="flex-1 p-3 hover:bg-slate-50 transition-colors group cursor-pointer flex flex-col justify-center border-l border-slate-300 opacity-60" onClick={() => setTripType(TripType.ROUND_TRIP)}>
+                                                <label className="text-[12px] font-bold text-slate-500 block mb-1">Return</label>
+                                                <div className="text-sm text-slate-400">Tap to add a return date<br/>for good deal</div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Guests */}
+                                    <div className="lg:col-span-3">
+                                        <PassengerSelector 
+                                            adults={adults} setAdults={setAdults}
+                                            child={child} setChild={setChild}
+                                            infant={infant} setInfant={setInfant}
+                                            flightClass={flightClass} setFlightClass={setFlightClass}
+                                        />
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="space-y-4 mb-6">
+                                    {multiCityFlights.map((flight, idx) => (
+                                        <div key={idx} className="grid grid-cols-1 lg:grid-cols-12 gap-2 relative">
+                                            {/* Locations (From/To) */}
+                                            <div className="lg:col-span-5 grid grid-cols-1 md:grid-cols-2 gap-0 relative border border-slate-300 rounded-xl overflow-visible shadow-sm">
+                                                <div className="flex-1 right-border md:border-r border-slate-300 last:border-0 relative">
+                                                    <AirportSelector 
+                                                        label="From" 
+                                                        value={flight.from} 
+                                                        onChange={(v: string) => {
+                                                            const newFlights = [...multiCityFlights];
+                                                            newFlights[idx].from = v;
+                                                            setMultiCityFlights(newFlights);
+                                                        }} 
+                                                        placeholder="Select Airport" 
+                                                        airports={airportsList} 
+                                                    />
+                                                </div>
+                                                
+                                                {/* Swap Button */}
+                                                <button 
+                                                    onClick={() => {
+                                                        const newFlights = [...multiCityFlights];
+                                                        const temp = newFlights[idx].from;
+                                                        newFlights[idx].from = newFlights[idx].to;
+                                                        newFlights[idx].to = temp;
+                                                        setMultiCityFlights(newFlights);
+                                                    }}
+                                                    className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-blue-50 border border-blue-100 rounded-full flex items-center justify-center text-primary hover:bg-primary hover:text-white transition-all z-10 hidden md:flex"
+                                                >
+                                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-4 h-4">
+                                                        <path d="M17 4V14M17 14L13 10M17 14L21 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                                        <path d="M7 20V10M7 10L3 14M7 10L11 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                                    </svg>
+                                                </button>
+
+                                                <div className="flex-1">
+                                                    <AirportSelector 
+                                                        label="To" 
+                                                        value={flight.to} 
+                                                        onChange={(v: string) => {
+                                                            const newFlights = [...multiCityFlights];
+                                                            newFlights[idx].to = v;
+                                                            setMultiCityFlights(newFlights);
+                                                        }} 
+                                                        placeholder="Select Airport" 
+                                                        airports={airportsList} 
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            {/* Date */}
+                                            <div className="lg:col-span-4 flex rounded-xl border border-slate-300 shadow-sm">
+                                                <div className="flex-1 p-3 hover:bg-slate-50 transition-colors group cursor-pointer flex flex-col justify-center">
+                                                    <label className="text-[12px] font-bold text-slate-500 block mb-1">Departure Date</label>
+                                                    <div className="flex items-center">
+                                                        <input 
+                                                          type="date" 
+                                                          className="w-full bg-transparent font-bold text-sm md:text-base outline-none text-slate-900 cursor-pointer"
+                                                          value={flight.date}
+                                                          min={idx === 0 ? new Date().toISOString().split('T')[0] : multiCityFlights[idx-1].date}
+                                                          onChange={(e) => {
+                                                              const newFlights = [...multiCityFlights];
+                                                              newFlights[idx].date = e.target.value;
+                                                              setMultiCityFlights(newFlights);
+                                                          }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Guests or Add button */}
+                                            <div className="lg:col-span-3">
+                                                {idx === 0 ? (
+                                                    <PassengerSelector 
+                                                        adults={adults} setAdults={setAdults}
+                                                        child={child} setChild={setChild}
+                                                        infant={infant} setInfant={setInfant}
+                                                        flightClass={flightClass} setFlightClass={setFlightClass}
+                                                    />
+                                                ) : idx === multiCityFlights.length - 1 ? (
+                                                    <div className="flex h-full gap-2">
+                                                        {multiCityFlights.length > 2 && (
+                                                            <button 
+                                                                onClick={() => {
+                                                                    setMultiCityFlights(multiCityFlights.filter((_, i) => i !== idx));
+                                                                }}
+                                                                className="flex-1 border border-rose-300 rounded-xl hover:bg-rose-50 hover:border-rose-400 text-rose-500 transition-colors bg-white font-bold h-[80px]"
+                                                            >
+                                                                Remove
+                                                            </button>
+                                                        )}
+                                                        <button 
+                                                            onClick={() => {
+                                                                setMultiCityFlights([...multiCityFlights, {
+                                                                    from: flight.to,
+                                                                    to: '',
+                                                                    date: flight.date
+                                                                }]);
+                                                            }}
+                                                            className="flex-1 border border-amber-400 rounded-xl hover:bg-amber-50 hover:border-amber-500 text-amber-500 transition-colors bg-white font-bold h-[80px] flex items-center justify-center flex-col"
+                                                        >
+                                                            <div className="w-6 h-6 rounded-full bg-amber-400 text-white flex items-center justify-center mb-1">
+                                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+                                                            </div>
+                                                            Add
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <div className="h-full">
+                                                        <button 
+                                                            onClick={() => {
+                                                                setMultiCityFlights(multiCityFlights.filter((_, i) => i !== idx));
+                                                            }}
+                                                            className="w-full border border-rose-300 rounded-xl hover:bg-rose-50 hover:border-rose-400 text-rose-500 transition-colors bg-white font-bold h-[80px]"
+                                                        >
+                                                            Remove
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            <div className="flex flex-wrap items-center justify-between mt-4">
+                                <div className="flex space-x-6 items-center">
+                                    <div className={`flex items-center space-x-2 cursor-pointer font-bold transition ${fareType === 'Regular Fare' ? 'text-primary' : 'text-slate-500 hover:text-primary'}`} onClick={() => setFareType('Regular Fare')}>
+                                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${fareType === 'Regular Fare' ? 'border-primary' : 'border-slate-300'}`}>
+                                            {fareType === 'Regular Fare' && <div className="w-2.5 h-2.5 bg-primary rounded-full"></div>}
+                                        </div>
+                                        <span>Regular Fare</span>
+                                    </div>
+                                    <div className={`flex items-center space-x-2 cursor-pointer font-bold transition ${fareType === 'Student Fare' ? 'text-primary' : 'text-slate-500 hover:text-primary'}`} onClick={() => setFareType('Student Fare')}>
+                                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${fareType === 'Student Fare' ? 'border-primary' : 'border-slate-300'}`}>
+                                            {fareType === 'Student Fare' && <div className="w-2.5 h-2.5 bg-primary rounded-full"></div>}
+                                        </div>
+                                        <span>Student Fare</span>
+                                    </div>
+                                    <div className="flex items-center space-x-2 cursor-pointer font-bold text-slate-700 transition" onClick={() => setComboFare(!comboFare)}>
+                                        <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${comboFare ? 'border-amber-500 bg-amber-500' : 'border-slate-300'}`}>
+                                            {comboFare && (
+                                                <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                                </svg>
+                                            )}
+                                        </div>
+                                        <span>Combo Fare <span className="font-normal">(Domestic Round Trip)</span></span>
+                                    </div>
+                                </div>
+                                <button 
+                                    onClick={handleFlightSearch}
+                                    className="bg-amber-400 hover:bg-amber-500 text-white font-bold text-lg rounded-xl px-12 py-3 shadow-lg shadow-amber-400/30 transition transform hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center min-w-[150px]"
+                                >
+                                    Search
+                                </button>
+                            </div>
+                        </>
                     )}
                 </motion.div>
             ) : (
@@ -337,7 +695,7 @@ const HomePage: React.FC<HomePageProps> = ({ onSearch, onHotelSearch }) => {
                         </div>
 
                         <div className="lg:col-span-2 border border-slate-300 rounded-xl p-3 hover:border-secondary transition-colors focus-within:border-secondary focus-within:ring-2 focus-within:ring-secondary/20 group bg-white shadow-sm h-[72px] flex flex-col justify-center">
-                            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block group-focus-within:text-secondary">Guests & Rooms</label>
+                            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block group-focus-within:text-secondary">Guests</label>
                             <div className="flex items-center">
                                 <select 
                                     className="w-full bg-transparent font-bold text-lg md:text-xl outline-none text-slate-900 cursor-pointer appearance-none"
@@ -366,18 +724,7 @@ const HomePage: React.FC<HomePageProps> = ({ onSearch, onHotelSearch }) => {
         </div>
       </motion.div>
 
-      {/* Trust & Partners Strip */}
-      <div className="max-w-7xl mx-auto px-4 mt-16 pb-8 border-b border-slate-100 hidden md:block">
-          <p className="text-center text-sm font-semibold text-slate-400 mb-6 uppercase tracking-wider">Trusted by Leading Airlines worldwide</p>
-          <div className="flex justify-center items-center gap-12 flex-wrap opacity-60 grayscale hover:grayscale-0 transition-all duration-500">
-               {PARTNERS.map((partner, idx) => (
-                   <div key={idx} className="flex items-center gap-2 hover:text-primary transition-colors cursor-pointer">
-                       <Plane className="w-5 h-5" />
-                       <span className="font-bold text-lg font-serif">{partner.name}</span>
-                   </div>
-               ))}
-          </div>
-      </div>
+
 
       {/* Blog */}
       {features.blogEnabled && (
@@ -443,21 +790,21 @@ const HomePage: React.FC<HomePageProps> = ({ onSearch, onHotelSearch }) => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                   {destinations.slice(0, 4).map((dest, idx) => (
-                      <Link to={`/destinations`} key={dest.id || idx} className="group rounded-2xl overflow-hidden cursor-pointer relative h-96 block">
-                          <img src={dest.image} alt={dest.city} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent"></div>
+                      <div key={dest.id || idx} className="group rounded-2xl overflow-hidden relative h-96 block">
+                          <img src={dest.image} alt={dest.city} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 cursor-pointer" onClick={() => navigate('/destinations')} />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent pointer-events-none"></div>
                           
-                          <div className="absolute bottom-0 left-0 p-6 w-full">
+                          <div className="absolute bottom-0 left-0 p-6 w-full pointer-events-none">
                               <span className="text-sm font-bold text-white/80 uppercase tracking-wider mb-1 block">{dest.country}</span>
                               <h3 className="text-2xl font-bold text-white mb-2 font-serif">{dest.city}</h3>
-                              <div className="flex justify-between items-center mt-4">
+                              <div className="flex justify-between items-center mt-4 pointer-events-auto">
                                   <span className="bg-secondary text-white px-3 py-1 rounded-full text-sm font-bold">{dest.price}</span>
-                                  <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white group-hover:bg-primary transition-colors">
+                                  <Link to={`/destination-consultation/${dest.id}`} className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white hover:bg-primary transition-colors cursor-pointer" title="Request Booking">
                                       <ArrowRight className="w-5 h-5" />
-                                  </div>
+                                  </Link>
                               </div>
                           </div>
-                      </Link>
+                      </div>
                   ))}
               </div>
           </div>

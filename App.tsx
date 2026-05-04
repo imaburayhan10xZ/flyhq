@@ -9,8 +9,16 @@ import ConfirmationPage from './pages/ConfirmationPage';
 import AdminDashboard from './pages/AdminDashboard';
 import HotelsPage from './pages/HotelsPage';
 import HolidaysPage from './pages/HolidaysPage';
+import HolidayDetailsPage from './pages/HolidayDetailsPage';
 import VisaPage from './pages/VisaPage';
+import VisaDetailsPage from './pages/VisaDetailsPage';
+import VisaConsultationPage from './pages/VisaConsultationPage';
+import HolidayConsultationPage from './pages/HolidayConsultationPage';
+import HotelConsultationPage from './pages/HotelConsultationPage';
+import DestinationConsultationPage from './pages/DestinationConsultationPage';
 import GenericPage from './pages/GenericPage';
+import ContactPage from './pages/ContactPage';
+import SuccessPage from './pages/SuccessPage';
 import CareersPage from './pages/CareersPage';
 import PressMediaPage from './pages/PressMediaPage';
 import TravelBlogPage from './pages/TravelBlogPage';
@@ -156,10 +164,34 @@ const App: React.FC = () => {
                   <ConfirmationPage bookingId={confirmedBookingId} onHome={() => navigate('/')} />
                 ) : <HomePage onSearch={handleSearch} onHotelSearch={handleHotelSearch} />
               } />
-              {features.destinationsEnabled && <Route path="/destinations" element={<DestinationsPage />} />}
-              {features.hotelsEnabled && <Route path="/hotels" element={<HotelsPage />} />}
-              {features.holidaysEnabled && <Route path="/holidays" element={<HolidaysPage />} />}
-              {features.visaEnabled && <Route path="/visa" element={<VisaPage />} />}
+              {features.destinationsEnabled && (
+                <>
+                  <Route path="/destinations" element={<DestinationsPage />} />
+                  <Route path="/destination-consultation/:id" element={<DestinationConsultationPage />} />
+                </>
+              )}
+              {features.hotelsEnabled && (
+                <>
+                  <Route path="/hotels" element={<HotelsPage />} />
+                  <Route path="/hotel-consultation/:id" element={<HotelConsultationPage />} />
+                </>
+              )}
+              {features.holidaysEnabled && (
+                <>
+                  <Route path="/holidays" element={<HolidaysPage />} />
+                  <Route path="/holidays/:id" element={<HolidayDetailsPage />} />
+                  <Route path="/holiday-consultation/:id" element={<HolidayConsultationPage />} />
+                </>
+              )}
+              {features.visaEnabled && (
+                <>
+                  <Route path="/visa" element={<VisaPage />} />
+                  <Route path="/visa/:id" element={<VisaDetailsPage />} />
+                  <Route path="/visa-consultation/:id" element={<VisaConsultationPage />} />
+                </>
+              )}
+              <Route path="/contact" element={<ContactPage />} />
+              <Route path="/success" element={<SuccessPage />} />
               <Route path="/about" element={<GenericPage pageId="about" defaultTitle="About Us" />} />
               <Route path="/help" element={<GenericPage pageId="help" defaultTitle="Help Center" />} />
               <Route path="/privacy" element={<GenericPage pageId="privacy" defaultTitle="Privacy Policy" />} />

@@ -113,6 +113,23 @@ service cloud.firestore {
        allow delete: if isAdmin();
     }
 
+    match /consultations/{consultationId} {
+       function isValidConsultation(data) {
+           return data.keys().hasAll(['type', 'itemId', 'itemName', 'name', 'phone', 'email', 'status'])
+               && data.type is string && (data.type == 'visa' || data.type == 'holiday' || data.type == 'hotel' || data.type == 'flight' || data.type == 'destination')
+               && data.itemId is string && data.itemId.size() <= 128
+               && data.itemName is string && data.itemName.size() <= 128
+               && data.name is string && data.name.size() <= 100
+               && data.phone is string && data.phone.size() <= 50
+               && data.email is string && data.email.size() <= 100
+               && data.status is string && (data.status == 'pending' || data.status == 'contacted' || data.status == 'completed');
+       }
+       allow read: if isAdmin();
+       allow create: if isValidConsultation(incoming());
+       allow update: if isAdmin() && isValidConsultation(incoming());
+       allow delete: if isAdmin();
+    }
+
     match /pages/{pageId} {
        function isValidPage(data) {
            return data.keys().hasAll(['title', 'content'])

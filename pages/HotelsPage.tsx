@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { BedDouble, MapPin, Star, Loader2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { getHotelOffers } from '../services/firebaseService';
 
 const HotelsPage: React.FC = () => {
+  const navigate = useNavigate();
   const [hotels, setHotels] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -75,8 +77,8 @@ const HotelsPage: React.FC = () => {
                                 <span className="text-2xl font-black text-primary">${hotel.price}</span>
                                 <span className="text-sm text-slate-500 font-medium">/night</span>
                             </div>
-                            <button className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold hover:bg-primary transition shadow-md hover:shadow-lg">
-                                View Deal
+                            <button onClick={() => navigate(`/hotel-consultation/${hotel.id}`)} className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold hover:bg-primary transition shadow-md hover:shadow-lg">
+                                Request Booking
                             </button>
                         </div>
                     </div>

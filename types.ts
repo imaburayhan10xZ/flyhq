@@ -1,5 +1,6 @@
 export enum FlightClass {
   ECONOMY = 'Economy',
+  PREMIUM_ECONOMY = 'Premium Economy',
   BUSINESS = 'Business',
   FIRST = 'First'
 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Plane, User, Phone, ShieldCheck, MapPin, Mail, Navigation, Facebook, Instagram, Twitter, Linkedin, Send, Youtube, MessageCircle, Video } from 'lucide-react';
+import { Plane, User, Phone, ShieldCheck, MapPin, Mail, Navigation, Facebook, Instagram, Twitter, Linkedin, Send, Youtube, MessageCircle, Video, Headphones } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Link, useLocation } from 'react-router-dom';
 import { getSupportChannels } from '../services/firebaseService';
@@ -73,46 +73,43 @@ const Layout: React.FC<LayoutProps> = ({ children, customLogo }) => {
             
             <nav className="hidden lg:flex items-center space-x-1">
               {[
-                  { id: 'home', show: features.topNavHomeEnabled !== false }, 
-                  { id: 'hotels', show: features.topNavHotelsEnabled !== false && features.hotelsEnabled !== false }, 
-                  { id: 'holidays', show: features.topNavHolidaysEnabled !== false && features.holidaysEnabled !== false }, 
-                  { id: 'visa', show: features.topNavVisaEnabled !== false && features.visaEnabled !== false },
-                  { id: 'about', show: features.topNavAboutEnabled === true },
-                  { id: 'careers', show: features.topNavCareersEnabled === true && features.careersEnabled !== false },
-                  { id: 'press', show: features.topNavPressEnabled === true && features.pressEnabled !== false },
-                  { id: 'blog', show: features.topNavBlogEnabled === true && features.blogEnabled !== false },
-                  { id: 'help', show: features.topNavHelpEnabled === true },
-                  { id: 'privacy', show: features.topNavPrivacyEnabled === true },
-                  { id: 'terms', show: features.topNavTermsEnabled === true },
-                  { id: 'refund', show: features.topNavRefundEnabled === true },
-              ].filter(item => item.show).map(({ id: item }) => {
+                  { id: 'home', label: 'Home', show: features.topNavHomeEnabled !== false }, 
+                  { id: 'hotels', label: 'Hotels', show: features.topNavHotelsEnabled !== false && features.hotelsEnabled !== false }, 
+                  { id: 'holidays', label: 'Holidays', show: features.topNavHolidaysEnabled !== false && features.holidaysEnabled !== false }, 
+                  { id: 'visa', label: 'Visa', show: features.topNavVisaEnabled !== false && features.visaEnabled !== false },
+                  { id: 'about', label: 'About', show: features.topNavAboutEnabled === true },
+                  { id: 'careers', label: 'Careers', show: features.topNavCareersEnabled === true && features.careersEnabled !== false },
+                  { id: 'press', label: 'Press', show: features.topNavPressEnabled === true && features.pressEnabled !== false },
+                  { id: 'blog', label: 'Blog', show: features.topNavBlogEnabled === true && features.blogEnabled !== false },
+                  { id: 'help', label: 'Help', show: features.topNavHelpEnabled === true },
+                  { id: 'privacy', label: 'Privacy', show: features.topNavPrivacyEnabled === true },
+                  { id: 'terms', label: 'Terms', show: features.topNavTermsEnabled === true },
+                  { id: 'refund', label: 'Refund', show: features.topNavRefundEnabled === true },
+              ].filter(item => item.show).map(({ id: item, label }) => {
                   const targetPath = item === 'home' ? '/' : `/${item}`;
                   const isActive = currentPage === item || (item === 'home' && currentPage === '');
                   return (
                     <Link 
                       key={item}
                       to={targetPath}
-                      className={`relative px-5 py-2 text-sm font-bold capitalize transition-colors rounded-full
+                      className={`relative px-5 py-2 text-sm font-bold transition-colors rounded-full
                         ${isActive 
                             ? 'text-primary bg-blue-50/80' 
                             : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'}`}
                     >
-                      {item}
+                      {label}
                     </Link>
                   );
               })}
             </nav>
 
             <div className="flex items-center space-x-4">
-              <div className="hidden md:flex items-center bg-slate-50 px-4 py-2 rounded-full border border-slate-100 shadow-sm">
-                <div className="w-8 h-8 rounded-full bg-secondary/10 flex items-center justify-center mr-3">
-                    <Phone className="w-4 h-4 text-secondary" />
+              <Link to="/contact" className="hidden md:flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-2.5 rounded-full shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 hover:-translate-y-0.5 transition-all duration-300 group ring-1 ring-white/20">
+                <div className="bg-white/20 p-1.5 rounded-full group-hover:bg-white/30 transition-colors">
+                    <Headphones className="w-4 h-4 text-white" />
                 </div>
-                <div className="flex flex-col">
-                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">24/7 Support</span>
-                    <span className="text-sm font-extrabold text-slate-800">01748-116167</span>
-                </div>
-              </div>
+                <span className="text-sm font-bold text-white tracking-wide">Contact Us</span>
+              </Link>
             </div>
 
           </div>
@@ -190,8 +187,13 @@ const Layout: React.FC<LayoutProps> = ({ children, customLogo }) => {
                           case 'tiktok': Icon = Video; hoverColor = "hover:bg-[#000000]"; break;
                       }
                       
+                      const p = social.platform;
+                      const url = social.link.startsWith('http') ? social.link : 
+                          (p === 'whatsapp' ? `https://wa.me/${social.link.replace(/[^0-9]/g, '')}` : 
+                          (p === 'telegram' ? `https://t.me/${social.link.replace('@', '')}` : `https://${p}.com/${social.link}`));
+                      
                       return (
-                          <a key={idx} href={social.link.startsWith('http') ? social.link : `https://${social.link}`} target="_blank" rel="noreferrer" className={`w-10 h-10 bg-slate-800 rounded-full flex items-center justify-center ${hoverColor} hover:-translate-y-1 transition-all duration-300 group`}>
+                          <a key={idx} href={url} target="_blank" rel="noreferrer" className={`w-10 h-10 bg-slate-800 rounded-full flex items-center justify-center ${hoverColor} hover:-translate-y-1 transition-all duration-300 group`}>
                               <Icon className="w-4 h-4 text-slate-300 group-hover:text-white" />
                           </a>
                       )
@@ -214,6 +216,7 @@ const Layout: React.FC<LayoutProps> = ({ children, customLogo }) => {
             <div className="md:col-span-2">
               <h3 className="font-bold text-lg mb-6 text-white tracking-wide">Support</h3>
               <ul className="space-y-4 text-slate-400 font-medium">
+                <li><Link to="/contact" onClick={() => window.scrollTo(0,0)} className="hover:text-secondary hover:translate-x-1 transition-transform inline-block">Contact Us</Link></li>
                 {features.navHelpEnabled !== false && <li><Link to="/help" onClick={() => window.scrollTo(0,0)} className="hover:text-secondary hover:translate-x-1 transition-transform inline-block">Help Center</Link></li>}
                 {features.navPrivacyEnabled !== false && <li><Link to="/privacy" onClick={() => window.scrollTo(0,0)} className="hover:text-secondary hover:translate-x-1 transition-transform inline-block">Privacy Policy</Link></li>}
                 {features.navTermsEnabled !== false && <li><Link to="/terms" onClick={() => window.scrollTo(0,0)} className="hover:text-secondary hover:translate-x-1 transition-transform inline-block">Terms of Service</Link></li>}

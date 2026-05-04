@@ -1,4 +1,4 @@
-import { collection, doc, setDoc, getDoc, getDocFromServer, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, setDoc, getDoc, getDocFromServer, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, addDoc } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { Flight, Passenger, Booking } from '../types';
 
@@ -493,6 +493,51 @@ export const saveFeaturesConfig = async (data: any) => {
         await setDoc(doc(db, 'settings', 'features'), data);
     } catch (error) {
         handleFirestoreError(error, OperationType.WRITE, path);
+        throw error;
+    }
+}
+
+export const saveConsultation = async (data: any) => {
+    const path = 'consultations';
+    try {
+        await addDoc(collection(db, path), {
+            ...data,
+            status: 'pending',
+            createdAt: serverTimestamp()
+        });
+    } catch (error) {
+        handleFirestoreError(error, OperationType.WRITE, path);
+        throw error;
+    }
+}
+
+export const getConsultations = async () => {
+    const path = 'consultations';
+    try {
+        const snap = await getDocs(query(collection(db, path), orderBy('createdAt', 'desc')));
+        return snap.docs.map(d => ({ ...d.data(), id: d.id }));
+    } catch (error) {
+        handleFirestoreError(error, OperationType.LIST, path);
+        return [];
+    }
+}
+
+export const updateConsultationStatus = async (id: string, status: string) => {
+    const path = `consultations/${id}`;
+    try {
+        await updateDoc(doc(db, 'consultations', id), { status });
+    } catch (error) {
+        handleFirestoreError(error, OperationType.UPDATE, path);
+        throw error;
+    }
+}
+
+export const updateConsultationNotes = async (id: string, notes: string) => {
+    const path = `consultations/${id}`;
+    try {
+        await updateDoc(doc(db, 'consultations', id), { notes });
+    } catch (error) {
+        handleFirestoreError(error, OperationType.UPDATE, path);
         throw error;
     }
 }

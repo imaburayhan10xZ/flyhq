@@ -85,7 +85,23 @@
         "createdAt": { "type": "number" }
       },
       "required": ["country", "description", "price", "processingTime"]
-    }
+    },
+    "Consultation": {
+      "title": "Consultation",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string" },
+        "itemId": { "type": "string" },
+        "itemName": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "message": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "object" }
+      },
+      "required": ["type", "itemId", "itemName", "name", "email", "phone", "status", "createdAt"]
+    },
     "PageData": {
       "title": "PageData",
       "type": "object",
@@ -157,6 +173,9 @@
     },
     "/visaServices/{visaId}": {
       "schema": { "$ref": "#/entities/VisaService" }
+    },
+    "/consultations/{consultationId}": {
+      "schema": { "$ref": "#/entities/Consultation" }
     },
     "/pages/{pageId}": {
       "schema": { "$ref": "#/entities/PageData" }

@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { FileText, Clock, Globe, Loader2, CheckCircle2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { getVisaServices } from '../services/firebaseService';
 
 const VisaPage: React.FC = () => {
+  const navigate = useNavigate();
   const [visas, setVisas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -79,8 +81,8 @@ const VisaPage: React.FC = () => {
                             <span className="text-sm text-slate-500 font-medium block">Processing Fee</span>
                             <span className="text-2xl font-black text-orange-600">${visa.price}</span>
                         </div>
-                        <button className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold hover:bg-orange-600 transition shadow-md hover:shadow-lg">
-                            Apply Now
+                        <button onClick={() => { window.scrollTo(0,0); navigate(`/visa/${visa.id}`); }} className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold hover:bg-orange-600 transition shadow-md hover:shadow-lg">
+                            Details
                         </button>
                     </div>
                   </motion.div>

@@ -7,12 +7,12 @@ import {
   LayoutDashboard, Ticket, DollarSign, Users, Upload, Image as ImageIcon, 
   Loader2, CheckCircle, Search, Menu, Settings, Plane, BedDouble, 
   Plus, Edit2, Trash2, Bell, ChevronRight, MoreVertical, X, LogIn, ShieldCheck,
-  Palmtree, FileText, Phone, LogOut, CreditCard, ToggleLeft, ToggleRight
+  Palmtree, FileText, Phone, LogOut, CreditCard, ToggleLeft, ToggleRight, Mail
 } from 'lucide-react';
 import { uploadImage } from '../services/cloudinaryService';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../components/AuthProvider';
-import { getHotelOffers, saveHotelOffer, deleteHotelOffer, getHolidayPackages, saveHolidayPackage, deleteHolidayPackage, getVisaServices, saveVisaService, deleteVisaService, getPageData, savePageData, getJobs, saveJob, deleteJob, getPressReleases, savePressRelease, deletePressRelease, getBlogPosts, saveBlogPost, deleteBlogPost, getSupportChannels, saveSupportChannels, getDestinations, saveDestination, deleteDestination, getAdminFlights, saveAdminFlight, deleteAdminFlight, getUsers, updateUserRole, getPaymentMethodsConfig, savePaymentMethodsConfig, getFeaturesConfig, saveFeaturesConfig } from '../services/firebaseService';
+import { getHotelOffers, saveHotelOffer, deleteHotelOffer, getHolidayPackages, saveHolidayPackage, deleteHolidayPackage, getVisaServices, saveVisaService, deleteVisaService, getPageData, savePageData, getJobs, saveJob, deleteJob, getPressReleases, savePressRelease, deletePressRelease, getBlogPosts, saveBlogPost, deleteBlogPost, getSupportChannels, saveSupportChannels, getDestinations, saveDestination, deleteDestination, getAdminFlights, saveAdminFlight, deleteAdminFlight, getUsers, updateUserRole, getPaymentMethodsConfig, savePaymentMethodsConfig, getFeaturesConfig, saveFeaturesConfig, getConsultations, updateConsultationStatus, updateConsultationNotes } from '../services/firebaseService';
 
 interface AdminDashboardProps {
     onLogoUpdate?: (url: string) => void;
@@ -62,6 +62,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
   const [adminFlights, setAdminFlights] = useState<any[]>([]);
   const [destinations, setDestinations] = useState<any[]>([]);
   const [usersList, setUsersList] = useState<any[]>([]);
+  const [consultations, setConsultations] = useState<any[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<any>({ card: true, bkash: true });
   const [featuresConfig, setFeaturesConfig] = useState<any>({ 
       flightsEnabled: true, hotelsEnabled: true, 
@@ -92,6 +93,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
   const [isModalOpen, setModalOpen] = useState(false);
   const [modalType, setModalType] = useState<'hotel'|'holiday'|'visa'|'career'|'press'|'blog'|'destination'|'flight'|'modules'|'navbar'|null>(null);
   const [formData, setFormData] = useState<any>({});
+  
+  const [isConsultationModalOpen, setConsultationModalOpen] = useState(false);
+  const [selectedConsultation, setSelectedConsultation] = useState<any>(null);
+  const [consultationNotes, setConsultationNotes] = useState('');
 
   useEffect(() => {
       if (!isAdmin) return;
@@ -238,7 +243,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
     if (!isAdmin) return;
     const fetchData = async () => {
       try {
-        const [b, h, hol, v, p, j, pr, bl, dests, flights, usersData] = await Promise.all([
+        const [b, h, hol, v, p, j, pr, bl, dests, flights, usersData, consultations] = await Promise.all([
             getFirebaseBookings(),
             getHotelOffers(),
             getHolidayPackages(),
@@ -249,7 +254,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
             getBlogPosts(),
             getDestinations(),
             getAdminFlights(),
-            getUsers()
+            getUsers(),
+            getConsultations()
         ]);
         setBookings(b || []);
         setHotels(h || []);
@@ -262,6 +268,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
         setDestinations(dests || []);
         setAdminFlights(flights || []);
         setUsersList(usersData || []);
+        setConsultations(consultations || []);
         const validBookings = b || [];
         const totalRevenue = validBookings.reduce((sum, booking) => sum + booking.totalAmount, 0);
         setStats({
@@ -282,7 +289,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
 
   if (!user || !isAdmin) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 font-sans">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 font-sans p-4">
         <div className="max-w-md w-full bg-white p-8 rounded-3xl shadow-xl border border-slate-100 flex flex-col items-center">
             <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mb-6">
                 <ShieldCheck className="w-10 h-10 text-primary" />
@@ -317,13 +324,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
                             Sign In
                         </button>
                     </form>
-                    <div className="relative flex items-center justify-center mb-6">
-                        <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200"></div></div>
-                        <div className="relative bg-white px-4 text-sm text-slate-500 rounded-full font-medium">or continue with</div>
-                    </div>
-                    <button onClick={signInWithGoogle} className="w-full bg-primary hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl transition flex items-center justify-center shadow-lg shadow-blue-500/30">
-                        <LogIn className="w-5 h-5 mr-2" /> Sign In with Google
-                    </button>
                 </div>
             )}
         </div>
@@ -405,7 +405,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
 
   const TABS = [
       { id: 'overview', label: 'Dashboard', icon: LayoutDashboard },
-      { id: 'bookings', label: 'All Bookings', icon: Ticket },
+      { id: 'bookings', label: 'Consultations & Bookings', icon: Ticket },
       { id: 'flights', label: 'Flight Inventory', icon: Plane },
       { id: 'destinations', label: 'Destinations', icon: ImageIcon },
       { id: 'hotels', label: 'Hotel Partners', icon: BedDouble },
@@ -831,60 +831,83 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
                   <motion.div initial={{opacity: 0, y: 20}} animate={{opacity: 1, y: 0}} className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
                        <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between bg-slate-50/50">
                           <div>
-                              <h2 className="text-xl font-bold text-slate-900">All Bookings</h2>
-                              <p className="text-sm font-medium text-slate-500 mt-1">View and manage customer reservations in real-time.</p>
+                              <h2 className="text-xl font-bold text-slate-900">Consultations & Bookings</h2>
+                              <p className="text-sm font-medium text-slate-500 mt-1">View and manage customer reservations and consultation requests.</p>
                           </div>
                       </div>
                       <div className="overflow-x-auto">
-                        <table className="w-full text-sm text-left">
-                            <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
-                                <tr>
-                                    <th className="px-6 py-4 font-bold uppercase tracking-wider text-xs">Reference</th>
-                                    <th className="px-6 py-4 font-bold uppercase tracking-wider text-xs">Customer</th>
-                                    <th className="px-6 py-4 font-bold uppercase tracking-wider text-xs">Type</th>
-                                    <th className="px-6 py-4 font-bold uppercase tracking-wider text-xs">Net Revenue</th>
-                                    <th className="px-6 py-4 font-bold uppercase tracking-wider text-xs">Status</th>
-                                    <th className="px-6 py-4 font-bold uppercase tracking-wider text-xs text-right">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {bookings.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={6} className="px-6 py-20 text-center">
-                                            <Ticket className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                                            <span className="text-slate-500 font-bold text-base block">No bookings found in the system.</span>
-                                            <span className="text-slate-400 font-medium text-sm mt-1">When users book flights or hotels, they will appear here.</span>
-                                        </td>
-                                    </tr>
-                                ) : bookings.map(b => (
-                                    <tr key={b.id} className="hover:bg-slate-50 transition-colors group">
-                                        <td className="px-6 py-5">
-                                            <div className="font-bold text-slate-900 font-mono tracking-wide">{b.id}</div>
-                                            <div className="text-xs font-bold text-slate-400 mt-1">{new Date(b.bookingDate).toLocaleDateString()}</div>
-                                        </td>
-                                        <td className="px-6 py-5">
-                                            <div className="font-bold text-slate-900">{b.passenger.firstName} {b.passenger.lastName}</div>
-                                            <div className="text-xs font-medium text-slate-500 mt-1">{b.passenger.email}</div>
-                                        </td>
-                                        <td className="px-6 py-5">
-                                            <div className="flex items-center font-bold text-slate-700 bg-slate-100 w-fit px-3 py-1.5 rounded-lg border border-slate-200">
-                                                <Plane className="w-4 h-4 mr-2 text-primary" /> Flight
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-5 font-extrabold text-slate-900 text-base">${b.totalAmount}</td>
-                                        <td className="px-6 py-5">
-                                            <span className="px-3 py-1.5 rounded-full bg-green-50 text-green-700 text-xs font-bold border border-green-200 inline-flex items-center">
-                                                <span className="w-1.5 h-1.5 rounded-full bg-green-500 mr-2"></span>
-                                                {b.status}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-5 text-right">
-                                            <button className="text-primary bg-blue-50 hover:bg-primary hover:text-white border border-blue-100 hover:border-primary px-4 py-2 rounded-lg text-xs font-bold transition shadow-sm opacity-0 group-hover:opacity-100">View Details</button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                          <table className="w-full">
+                              <thead className="bg-slate-50/50 border-b border-slate-100">
+                                  <tr>
+                                      <th className="text-left px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest">Date</th>
+                                      <th className="text-left px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest">Client Name</th>
+                                      <th className="text-left px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest">Contact Info</th>
+                                      <th className="text-left px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest">Target</th>
+                                      <th className="text-left px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest">Status</th>
+                                      <th className="text-right px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest">Actions</th>
+                                  </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                  {consultations.length === 0 ? (
+                                      <tr>
+                                          <td colSpan={6} className="px-6 py-20 text-center">
+                                              <FileText className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+                                              <span className="text-slate-500 font-bold text-base block">No consultation or booking requests found.</span>
+                                          </td>
+                                      </tr>
+                                  ) : consultations.map(consultation => (
+                                      <tr key={consultation.id} className="hover:bg-slate-50/80 transition-colors group cursor-pointer" onClick={() => {
+                                          setSelectedConsultation(consultation);
+                                          setConsultationNotes(consultation.notes || '');
+                                          setConsultationModalOpen(true);
+                                      }}>
+                                          <td className="px-6 py-5 whitespace-nowrap text-sm text-slate-500">
+                                            {consultation.createdAt?.seconds ? new Date(consultation.createdAt.seconds * 1000).toLocaleDateString() : 'Unknown Date'}
+                                          </td>
+                                          <td className="px-6 py-5 font-bold text-slate-900">{consultation.name}</td>
+                                          <td className="px-6 py-5 text-sm text-slate-600">
+                                              <div>{consultation.phone}</div>
+                                              <div className="text-slate-400">{consultation.email}</div>
+                                          </td>
+                                          <td className="px-6 py-5 text-sm">
+                                            <span className="capitalize font-bold text-slate-700 bg-slate-100 px-2 py-1 rounded inline-block mb-1">{consultation.type}</span>
+                                            <div className="text-slate-500 text-xs">{consultation.itemName}</div>
+                                          </td>
+                                          <td className="px-6 py-5" onClick={(e) => e.stopPropagation()}>
+                                              <select 
+                                                value={consultation.status || 'pending'} 
+                                                onChange={async (e) => {
+                                                    const newStatus = e.target.value;
+                                                    setConsultations(prev => prev.map(c => c.id === consultation.id ? {...c, status: newStatus} : c));
+                                                    try {
+                                                        await updateConsultationStatus(consultation.id, newStatus);
+                                                    } catch (err) {
+                                                        alert("Failed to update status");
+                                                    }
+                                                }}
+                                                className={`text-xs font-bold px-3 py-1.5 rounded-lg border-2 outline-none appearance-none cursor-pointer ${
+                                                    consultation.status === 'contacted' ? 'bg-blue-50 text-blue-700 border-blue-200' : 
+                                                    consultation.status === 'completed' ? 'bg-green-50 text-green-700 border-green-200' : 
+                                                    'bg-orange-50 text-orange-700 border-orange-200'
+                                                }`}
+                                              >
+                                                  <option value="pending">Pending</option>
+                                                  <option value="contacted">Contacted</option>
+                                                  <option value="completed">Completed</option>
+                                              </select>
+                                          </td>
+                                          <td className="px-6 py-5 text-right">
+                                              <button onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  setSelectedConsultation(consultation);
+                                                  setConsultationNotes(consultation.notes || '');
+                                                  setConsultationModalOpen(true);
+                                              }} className="text-primary bg-blue-50 hover:bg-primary hover:text-white border border-blue-100 hover:border-primary px-4 py-2 rounded-lg text-xs font-bold transition shadow-sm opacity-0 group-hover:opacity-100">View Detail</button>
+                                          </td>
+                                      </tr>
+                                  ))}
+                              </tbody>
+                          </table>
                       </div>
                   </motion.div>
               );
@@ -1011,6 +1034,86 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
                                                   <button onClick={() => openModal('visa', visa)} className="text-slate-500 hover:text-blue-600 bg-slate-100 hover:bg-blue-50 p-2.5 rounded-lg transition"><Edit2 className="w-4 h-4" /></button>
                                                   <button className="text-slate-500 hover:text-red-600 bg-slate-100 hover:bg-red-50 p-2.5 rounded-lg transition" onClick={() => handleDeleteVisa(visa.id)}><Trash2 className="w-4 h-4" /></button>
                                               </div>
+                                          </td>
+                                      </tr>
+                                  ))}
+                              </tbody>
+                          </table>
+                      </div>
+                  </motion.div>
+              );
+          case 'consultations':
+              return (
+                  <motion.div initial={{opacity: 0, y: 20}} animate={{opacity: 1, y: 0}} className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                      <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between bg-slate-50/50">
+                          <div>
+                              <h2 className="text-xl font-bold text-slate-900">Consultation Requests</h2>
+                              <p className="text-sm font-medium text-slate-500 mt-1">Manage incoming requests for Visa, Hotels, Holidays, etc.</p>
+                          </div>
+                      </div>
+                      <div className="overflow-x-auto">
+                          <table className="w-full">
+                              <thead className="bg-slate-50/50 border-b border-slate-100">
+                                  <tr>
+                                      <th className="text-left px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest">Date</th>
+                                      <th className="text-left px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest">Client Name</th>
+                                      <th className="text-left px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest">Contact Info</th>
+                                      <th className="text-left px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest">Type / Target</th>
+                                      <th className="text-left px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest">Message</th>
+                                      <th className="text-left px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest">Status</th>
+                                      <th className="text-right px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest">Actions</th>
+                                  </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                  {consultations.map(consultation => (
+                                      <tr key={consultation.id} className="hover:bg-slate-50/80 transition-colors group cursor-pointer" onClick={() => {
+                                          setSelectedConsultation(consultation);
+                                          setConsultationNotes(consultation.notes || '');
+                                          setConsultationModalOpen(true);
+                                      }}>
+                                          <td className="px-6 py-5 whitespace-nowrap text-sm text-slate-500">
+                                            {consultation.createdAt?.seconds ? new Date(consultation.createdAt.seconds * 1000).toLocaleDateString() : 'Unknown Date'}
+                                          </td>
+                                          <td className="px-6 py-5 font-bold text-slate-900">{consultation.name}</td>
+                                          <td className="px-6 py-5 text-sm text-slate-600">
+                                              <div>{consultation.phone}</div>
+                                              <div className="text-slate-400">{consultation.email}</div>
+                                          </td>
+                                          <td className="px-6 py-5 text-sm">
+                                            <span className="capitalize font-bold text-slate-700">{consultation.type}</span>
+                                            <div className="text-slate-500 text-xs">{consultation.itemName}</div>
+                                          </td>
+                                          <td className="px-6 py-5 text-sm text-slate-500 max-w-xs truncate" title={consultation.message}>{consultation.message}</td>
+                                          <td className="px-6 py-5" onClick={(e) => e.stopPropagation()}>
+                                              <select 
+                                                value={consultation.status || 'pending'} 
+                                                onChange={async (e) => {
+                                                    const newStatus = e.target.value;
+                                                    setConsultations(prev => prev.map(c => c.id === consultation.id ? {...c, status: newStatus} : c));
+                                                    try {
+                                                        await updateConsultationStatus(consultation.id, newStatus);
+                                                    } catch (err) {
+                                                        alert("Failed to update status");
+                                                    }
+                                                }}
+                                                className={`text-xs font-bold px-3 py-1.5 rounded-lg border-2 outline-none appearance-none cursor-pointer ${
+                                                    consultation.status === 'contacted' ? 'bg-blue-50 text-blue-700 border-blue-200' : 
+                                                    consultation.status === 'completed' ? 'bg-green-50 text-green-700 border-green-200' : 
+                                                    'bg-orange-50 text-orange-700 border-orange-200'
+                                                }`}
+                                              >
+                                                  <option value="pending">Pending</option>
+                                                  <option value="contacted">Contacted</option>
+                                                  <option value="completed">Completed</option>
+                                              </select>
+                                          </td>
+                                          <td className="px-6 py-5 text-right">
+                                              <button onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  setSelectedConsultation(consultation);
+                                                  setConsultationNotes(consultation.notes || '');
+                                                  setConsultationModalOpen(true);
+                                              }} className="text-primary bg-blue-50 hover:bg-primary hover:text-white border border-blue-100 hover:border-primary px-4 py-2 rounded-lg text-xs font-bold transition shadow-sm opacity-0 group-hover:opacity-100">View Detail</button>
                                           </td>
                                       </tr>
                                   ))}
@@ -1592,6 +1695,114 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
                     <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
                         <button onClick={() => setModalOpen(false)} className="px-5 py-2.5 rounded-xl font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 transition">Cancel</button>
                         <button onClick={handleCreateSubmit} className="px-5 py-2.5 rounded-xl font-bold text-white bg-slate-900 hover:bg-slate-800 transition">{(modalType === 'modules' || modalType === 'navbar') ? 'Save Changes' : `Create ${modalType}`}</button>
+                    </div>
+                </motion.div>
+            </motion.div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {isConsultationModalOpen && selectedConsultation && (
+            <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+                <motion.div initial={{scale:0.95}} animate={{scale:1}} exit={{scale:0.95}} className="bg-white rounded-3xl shadow-xl border border-slate-100 max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh]">
+                    <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50 shrink-0">
+                        <h3 className="text-xl font-bold font-serif text-slate-800">Consultation Request Detail</h3>
+                        <button onClick={() => setConsultationModalOpen(false)} className="text-slate-400 hover:text-slate-600 transition"><X className="w-6 h-6" /></button>
+                    </div>
+                    <div className="p-6 space-y-6 overflow-y-auto custom-scrollbar flex-grow">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-4">
+                                <div>
+                                    <h4 className="text-sm font-bold text-slate-500 mb-1 uppercase tracking-wider">Client Information</h4>
+                                    <div className="p-4 bg-blue-50/50 rounded-xl border border-blue-100/50">
+                                        <p className="font-bold text-slate-900 text-lg mb-2">{selectedConsultation.name}</p>
+                                        <p className="text-sm text-slate-700 flex items-center gap-2 mb-1"><Phone className="w-4 h-4 text-primary" /> {selectedConsultation.phone}</p>
+                                        <p className="text-sm text-slate-700 flex items-center gap-2 mb-1"><Mail className="w-4 h-4 text-primary" /> {selectedConsultation.email}</p>
+                                    </div>
+                                </div>
+                                <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                                    <h4 className="text-sm font-bold text-slate-500 mb-1 uppercase tracking-wider">Request Details</h4>
+                                    <div className="mt-2 text-sm text-slate-700">
+                                        <div className="flex justify-between py-1 border-b border-slate-200">
+                                            <span className="text-slate-500">Service</span>
+                                            <span className="font-bold capitalize">{selectedConsultation.type}</span>
+                                        </div>
+                                        <div className="flex justify-between py-1 border-b border-slate-200">
+                                            <span className="text-slate-500">Target</span>
+                                            <span className="font-bold">{selectedConsultation.itemName}</span>
+                                        </div>
+                                        <div className="flex justify-between py-1">
+                                            <span className="text-slate-500">Submitted</span>
+                                            <span className="font-bold">{selectedConsultation.createdAt?.seconds ? new Date(selectedConsultation.createdAt.seconds * 1000).toLocaleString() : 'Date missing'}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="space-y-4">
+                                <div className="h-full flex flex-col">
+                                    <h4 className="text-sm font-bold text-slate-500 mb-1 uppercase tracking-wider">Client Message</h4>
+                                    <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 text-sm text-slate-700 leading-relaxed flex-grow whitespace-pre-wrap">
+                                        {selectedConsultation.message || <span className="text-slate-400 italic">No message provided.</span>}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h4 className="text-sm font-bold text-slate-500 mb-1 uppercase tracking-wider">Admin Notes</h4>
+                            <textarea 
+                                className="w-full bg-white border border-slate-200 rounded-xl p-4 font-medium text-slate-700 min-h-[120px] focus:ring-2 focus:ring-primary/20 outline-none transition" 
+                                placeholder="Add internal notes about this consultation here..." 
+                                value={consultationNotes} 
+                                onChange={e => setConsultationNotes(e.target.value)}
+                            ></textarea>
+                            <p className="text-xs text-slate-400 mt-2 flex items-center"><ShieldCheck className="w-4 h-4 mr-1" /> Notes are internal and not visible to the user.</p>
+                        </div>
+                    </div>
+                    <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-between items-center shrink-0">
+                        <div className="flex items-center gap-2">
+                           <span className="text-sm font-bold text-slate-600">Status:</span>
+                           <select 
+                                value={selectedConsultation.status || 'pending'} 
+                                onChange={async (e) => {
+                                    const newStatus = e.target.value;
+                                    const updated = { ...selectedConsultation, status: newStatus };
+                                    setSelectedConsultation(updated);
+                                    setConsultations(prev => prev.map(c => c.id === selectedConsultation.id ? {...c, status: newStatus} : c));
+                                    try {
+                                        await updateConsultationStatus(selectedConsultation.id, newStatus);
+                                    } catch (err) {
+                                        alert("Failed to update status");
+                                    }
+                                }}
+                                className={`text-sm font-bold px-3 py-1.5 rounded-lg border-2 outline-none appearance-none cursor-pointer ${
+                                    selectedConsultation.status === 'contacted' ? 'bg-blue-50 text-blue-700 border-blue-200' : 
+                                    selectedConsultation.status === 'completed' ? 'bg-green-50 text-green-700 border-green-200' : 
+                                    'bg-orange-50 text-orange-700 border-orange-200'
+                                }`}
+                              >
+                                  <option value="pending">Pending</option>
+                                  <option value="contacted">Contacted</option>
+                                  <option value="completed">Completed</option>
+                           </select>
+                        </div>
+                        <div className="flex gap-3">
+                            <button onClick={() => setConsultationModalOpen(false)} className="px-5 py-2.5 rounded-xl font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 transition">Close</button>
+                            <button 
+                                onClick={async () => {
+                                    try {
+                                        await updateConsultationNotes(selectedConsultation.id, consultationNotes);
+                                        setConsultations(prev => prev.map(c => c.id === selectedConsultation.id ? {...c, notes: consultationNotes} : c));
+                                        alert('Notes saved successfully');
+                                        setConsultationModalOpen(false);
+                                    } catch(e) {
+                                        alert('Failed to save notes');
+                                    }
+                                }} 
+                                className="px-5 py-2.5 rounded-xl font-bold text-white bg-primary hover:bg-blue-700 transition"
+                            >
+                                Save Notes
+                            </button>
+                        </div>
                     </div>
                 </motion.div>
             </motion.div>
