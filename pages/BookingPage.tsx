@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Flight, Passenger } from '../types';
-import { createFirebaseBooking } from '../services/firebaseService';
-import { ShieldCheck, CreditCard, User, Loader2, LogIn } from 'lucide-react';
+import { createFirebaseBooking, getPaymentMethodsConfig } from '../services/firebaseService';
+import { ShieldCheck, CreditCard, User, Loader2, LogIn, Plane } from 'lucide-react';
 import { useAuth } from '../components/AuthProvider';
 
 interface BookingPageProps {
@@ -14,6 +14,17 @@ const BookingPage: React.FC<BookingPageProps> = ({ flight, onSuccess, onBack }) 
   const { user, signInWithGoogle } = useAuth();
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [paymentConfig, setPaymentConfig] = useState<{card?: boolean, bkash?: boolean}>({ card: true, bkash: true });
+  
+  useEffect(() => {
+     getPaymentMethodsConfig().then(config => {
+         if (config) {
+             setPaymentConfig(config);
+             if (!config.card && config.bkash) setPaymentMethod('bkash');
+         }
+     });
+  }, []);
+
   const [passenger, setPassenger] = useState<Passenger>({
     firstName: '',
     lastName: '',
@@ -93,18 +104,22 @@ const BookingPage: React.FC<BookingPageProps> = ({ flight, onSuccess, onBack }) 
             </h3>
             
             <div className="flex space-x-4 mb-6">
-                <div 
-                    onClick={() => setPaymentMethod('card')}
-                    className={`cursor-pointer border-2 rounded-lg p-4 flex-1 flex items-center justify-center transition ${paymentMethod === 'card' ? 'border-primary bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}
-                >
-                    <span className="font-bold text-gray-700">Credit Card</span>
-                </div>
-                 <div 
-                    onClick={() => setPaymentMethod('bkash')}
-                    className={`cursor-pointer border-2 rounded-lg p-4 flex-1 flex items-center justify-center transition ${paymentMethod === 'bkash' ? 'border-pink-500 bg-pink-50' : 'border-gray-200 hover:border-gray-300'}`}
-                >
-                    <span className="font-bold text-pink-600">bKash</span>
-                </div>
+                {paymentConfig.card && (
+                    <div 
+                        onClick={() => setPaymentMethod('card')}
+                        className={`cursor-pointer border-2 rounded-lg p-4 flex-1 flex items-center justify-center transition ${paymentMethod === 'card' ? 'border-primary bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}
+                    >
+                        <span className="font-bold text-gray-700">Credit Card</span>
+                    </div>
+                )}
+                {paymentConfig.bkash && (
+                    <div 
+                        onClick={() => setPaymentMethod('bkash')}
+                        className={`cursor-pointer border-2 rounded-lg p-4 flex-1 flex items-center justify-center transition ${paymentMethod === 'bkash' ? 'border-pink-500 bg-pink-50' : 'border-gray-200 hover:border-gray-300'}`}
+                    >
+                        <span className="font-bold text-pink-600">bKash</span>
+                    </div>
+                )}
             </div>
 
             {paymentMethod === 'card' ? (
@@ -160,7 +175,9 @@ const BookingPage: React.FC<BookingPageProps> = ({ flight, onSuccess, onBack }) 
            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 sticky top-24">
                 <h3 className="font-bold text-gray-900 mb-4 text-lg">Flight Summary</h3>
                 <div className="flex items-center mb-4 pb-4 border-b">
-                    <img src={flight.airlineLogo} className="w-8 h-8 rounded-full mr-3" />
+                    <div className="w-8 h-8 rounded-full mr-3 bg-blue-50 text-primary flex items-center justify-center border border-blue-100">
+                        <Plane className="w-4 h-4" />
+                    </div>
                     <div>
                         <div className="font-semibold text-sm">{flight.airline}</div>
                         <div className="text-xs text-gray-500">{flight.flightNumber} • {flight.class}</div>

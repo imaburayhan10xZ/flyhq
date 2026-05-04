@@ -2,10 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { getBlogPosts } from '../services/firebaseService';
 import { Loader2, Calendar, User, ArrowRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const TravelBlogPage: React.FC = () => {
     const [posts, setPosts] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const navigate = useNavigate();
 
     useEffect(() => {
         getBlogPosts().then(d => {
@@ -22,7 +24,7 @@ const TravelBlogPage: React.FC = () => {
         <div className="min-h-screen bg-slate-50 pb-20">
             <div className="bg-white border-b border-slate-200 py-20 px-4 mb-12">
                 <div className="max-w-6xl mx-auto text-center">
-                    <h1 className="text-4xl md:text-6xl font-extrabold font-serif mb-6 text-slate-900">Travel Notebook</h1>
+                    <h1 className="text-4xl md:text-6xl font-extrabold font-serif mb-6 text-slate-900">Blog</h1>
                     <p className="text-xl text-slate-600 max-w-2xl mx-auto">Stories, guides, and inspiration for your next big adventure.</p>
                 </div>
             </div>
@@ -39,6 +41,7 @@ const TravelBlogPage: React.FC = () => {
                        {posts.map((post, idx) => (
                            <motion.article 
                               key={post.id} 
+                              onClick={() => { window.scrollTo(0, 0); navigate(`/blogs/post/${post.id}`); }}
                               initial={{opacity:0, y:20}} 
                               animate={{opacity:1, y:0}} 
                               transition={{delay: idx * 0.1}} 
@@ -68,6 +71,7 @@ const TravelBlogPage: React.FC = () => {
                    </div>
                )}
             </div>
+
         </div>
     );
 };

@@ -1,4 +1,4 @@
-import { collection, doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, setDoc, getDoc, getDocFromServer, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { Flight, Passenger, Booking } from '../types';
 
@@ -34,17 +34,7 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   throw new Error(JSON.stringify(errInfo));
 }
 
-// Ensure connection is active
-export async function testConnection() {
-  try {
-    const testDoc = await getDoc(doc(db, 'test', 'connection'));
-  } catch (error: any) {
-    if (error?.message?.includes('the client is offline')) {
-      console.error("Please check your Firebase configuration.");
-    }
-  }
-}
-testConnection();
+// Removed testConnection from here since it's in firebase.ts
 
 export const createFirebaseBooking = async (flight: Flight, passenger: Passenger, totalAmount: number): Promise<Booking> => {
   if (!auth.currentUser) throw new Error("Must be logged in to book.");
@@ -447,6 +437,62 @@ export const deleteBlogPost = async (id: string) => {
         await deleteDoc(doc(db, 'blogPosts', id));
     } catch (error) {
         handleFirestoreError(error, OperationType.DELETE, path);
+        throw error;
+    }
+}
+
+// -- Payment Methods --
+export const getPaymentMethodsConfig = async () => {
+    const path = 'settings/paymentMethods';
+    try {
+        const docSnap = await getDoc(doc(db, 'settings', 'paymentMethods'));
+        if (docSnap.exists()) {
+            return docSnap.data();
+        }
+        return { card: true, bkash: true }; // defaults
+    } catch (error) {
+        handleFirestoreError(error, OperationType.GET, path);
+        throw error;
+    }
+}
+
+export const savePaymentMethodsConfig = async (data: any) => {
+    const path = 'settings/paymentMethods';
+    try {
+        await setDoc(doc(db, 'settings', 'paymentMethods'), data);
+    } catch (error) {
+        handleFirestoreError(error, OperationType.WRITE, path);
+        throw error;
+    }
+}
+
+export const getFeaturesConfig = async () => {
+    const path = 'settings/features';
+    try {
+        const docSnap = await getDoc(doc(db, 'settings', 'features'));
+        if (docSnap.exists()) return docSnap.data();
+        return { 
+            flightsEnabled: true,
+            hotelsEnabled: true, 
+            holidaysEnabled: true,
+            visaEnabled: true,
+            destinationsEnabled: true,
+            blogEnabled: true,
+            careersEnabled: true,
+            pressEnabled: true
+        };
+    } catch (error) {
+        handleFirestoreError(error, OperationType.GET, path);
+        throw error;
+    }
+}
+
+export const saveFeaturesConfig = async (data: any) => {
+    const path = 'settings/features';
+    try {
+        await setDoc(doc(db, 'settings', 'features'), data);
+    } catch (error) {
+        handleFirestoreError(error, OperationType.WRITE, path);
         throw error;
     }
 }

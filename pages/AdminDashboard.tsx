@@ -7,19 +7,19 @@ import {
   LayoutDashboard, Ticket, DollarSign, Users, Upload, Image as ImageIcon, 
   Loader2, CheckCircle, Search, Menu, Settings, Plane, BedDouble, 
   Plus, Edit2, Trash2, Bell, ChevronRight, MoreVertical, X, LogIn, ShieldCheck,
-  Palmtree, FileText, Phone, LogOut
+  Palmtree, FileText, Phone, LogOut, CreditCard, ToggleLeft, ToggleRight
 } from 'lucide-react';
 import { uploadImage } from '../services/cloudinaryService';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../components/AuthProvider';
-import { getHotelOffers, saveHotelOffer, deleteHotelOffer, getHolidayPackages, saveHolidayPackage, deleteHolidayPackage, getVisaServices, saveVisaService, deleteVisaService, getPageData, savePageData, getJobs, saveJob, deleteJob, getPressReleases, savePressRelease, deletePressRelease, getBlogPosts, saveBlogPost, deleteBlogPost, getSupportChannels, saveSupportChannels, getDestinations, saveDestination, deleteDestination, getAdminFlights, saveAdminFlight, deleteAdminFlight, getUsers, updateUserRole } from '../services/firebaseService';
+import { getHotelOffers, saveHotelOffer, deleteHotelOffer, getHolidayPackages, saveHolidayPackage, deleteHolidayPackage, getVisaServices, saveVisaService, deleteVisaService, getPageData, savePageData, getJobs, saveJob, deleteJob, getPressReleases, savePressRelease, deletePressRelease, getBlogPosts, saveBlogPost, deleteBlogPost, getSupportChannels, saveSupportChannels, getDestinations, saveDestination, deleteDestination, getAdminFlights, saveAdminFlight, deleteAdminFlight, getUsers, updateUserRole, getPaymentMethodsConfig, savePaymentMethodsConfig, getFeaturesConfig, saveFeaturesConfig } from '../services/firebaseService';
 
 interface AdminDashboardProps {
     onLogoUpdate?: (url: string) => void;
     currentLogo?: string;
 }
 
-type TabType = 'overview' | 'bookings' | 'flights' | 'destinations' | 'hotels' | 'holidays' | 'visa' | 'pages' | 'careers' | 'press' | 'blog' | 'users' | 'settings' | 'support_channels';
+type TabType = 'overview' | 'bookings' | 'flights' | 'destinations' | 'hotels' | 'holidays' | 'visa' | 'pages' | 'careers' | 'press' | 'blog' | 'users' | 'settings' | 'support_channels' | 'payment_methods';
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLogo }) => {
   const { user, isAdmin, loading, signInWithGoogle, signInWithEmail, logout } = useAuth();
@@ -35,7 +35,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
     try {
       await signInWithEmail(email, password);
     } catch (err: any) {
-      setAuthError(err.message || 'Failed to sign in');
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
+          setAuthError('Invalid credentials. Please contact the administrator if you do not have an account.');
+      } else {
+          setAuthError(err.message || 'Failed to sign in');
+      }
     }
   };
 
@@ -58,10 +62,27 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
   const [adminFlights, setAdminFlights] = useState<any[]>([]);
   const [destinations, setDestinations] = useState<any[]>([]);
   const [usersList, setUsersList] = useState<any[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<any>({ card: true, bkash: true });
+  const [featuresConfig, setFeaturesConfig] = useState<any>({ 
+      flightsEnabled: true, hotelsEnabled: true, 
+      topNavHomeEnabled: true, topNavHotelsEnabled: true, topNavHolidaysEnabled: true, topNavVisaEnabled: true,
+      navHomeEnabled: true, navHotelsEnabled: true, navHolidaysEnabled: true, navVisaEnabled: true });
   const [selectedPageId, setSelectedPageId] = useState<string>('about');
   const [aboutUsData, setAboutUsData] = useState<any>({title: '', content: '', imageUrl: ''});
   const [supportData, setSupportData] = useState<any>({ address: '', phone: '', email: '', socials: [] });
-  const [isSidebarOpen, setSidebarOpen] = useState(true);
+  const [isSidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 1024);
+  
+  useEffect(() => {
+     const handleResize = () => {
+         if (window.innerWidth >= 1024) {
+             setSidebarOpen(true);
+         } else {
+             setSidebarOpen(false);
+         }
+     };
+     window.addEventListener('resize', handleResize);
+     return () => window.removeEventListener('resize', handleResize);
+  }, []);
   
   // Settings Upload State
   const [uploading, setUploading] = useState(false);
@@ -69,7 +90,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
   const [siteName, setSiteName] = useState('HQ Travels & Tours');
 
   const [isModalOpen, setModalOpen] = useState(false);
-  const [modalType, setModalType] = useState<'hotel'|'holiday'|'visa'|'career'|'press'|'blog'|'destination'|'flight'|null>(null);
+  const [modalType, setModalType] = useState<'hotel'|'holiday'|'visa'|'career'|'press'|'blog'|'destination'|'flight'|'modules'|'navbar'|null>(null);
   const [formData, setFormData] = useState<any>({});
 
   useEffect(() => {
@@ -85,12 +106,33 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
       getSupportChannels().then(data => {
           if (data) setSupportData(data);
       });
+      getPaymentMethodsConfig().then(data => {
+          if (data) setPaymentMethods(data);
+      });
+      getFeaturesConfig().then(data => {
+          if (data) setFeaturesConfig(data);
+      });
   }, [isAdmin]);
 
   const openModal = (type: 'hotel'|'holiday'|'visa'|'career'|'press'|'blog'|'destination'|'flight', data?: any) => {
       setModalType(type);
       setFormData(data || {});
       setModalOpen(true);
+  };
+
+  const handleModalImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      setUploading(true);
+      try {
+          const url = await uploadImage(file);
+          setFormData({...formData, imageUrl: url, image: url});
+      } catch (err) {
+          console.error('Failed to upload image', err);
+          alert('Failed to upload image.');
+      } finally {
+          setUploading(false);
+      }
   };
 
   const handleCreateSubmit = async () => {
@@ -144,7 +186,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
                 title: formData.title || 'Press Release',
                 date: formData.date || 'Today',
                 link: formData.link || '#',
-                publisher: formData.publisher || 'HQ Travels'
+                publisher: formData.publisher || 'HQ Travels',
+                description: formData.description || ''
             };
             await savePressRelease(id, data);
             setPressReleases(isEdit ? pressReleases.map(pr => pr.id === id ? {id, ...data} : pr) : [...pressReleases, {id, ...data}]);
@@ -180,6 +223,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
             };
             await saveAdminFlight(id, data);
             setAdminFlights(isEdit ? adminFlights.map(f => f.id === id ? {id, ...data} : f) : [...adminFlights, {id, ...data}]);
+        } else if (modalType === 'modules' || modalType === 'navbar') {
+            await saveFeaturesConfig(featuresConfig);
+            setModalOpen(false);
+            return;
         }
         setModalOpen(false);
     } catch(err) {
@@ -267,7 +314,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
                         />
                         {authError && <p className="text-red-500 text-sm font-medium">{authError}</p>}
                         <button type="submit" className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 px-4 rounded-xl transition">
-                            Sign In / Sign Up
+                            Sign In
                         </button>
                     </form>
                     <div className="relative flex items-center justify-center mb-6">
@@ -370,6 +417,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
       { id: 'blog', label: 'Travel Blog', icon: FileText },
       { id: 'support_channels', label: 'Support Channels', icon: Phone },
       { id: 'users', label: 'User Management', icon: Users },
+      { id: 'payment_methods', label: 'Payment Methods', icon: CreditCard },
       { id: 'settings', label: 'Platform Settings', icon: Settings },
   ];
 
@@ -479,6 +527,71 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
                       </div>
                   </motion.div>
               );
+          case 'payment_methods':
+              return (
+                  <motion.div initial={{opacity: 0, scale: 0.98}} animate={{opacity: 1, scale: 1}} className="max-w-4xl">
+                      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                          <div className="p-6 md:p-8 border-b border-slate-100">
+                              <h2 className="text-2xl font-bold text-slate-900">Payment Methods Control</h2>
+                              <p className="text-slate-500 mt-1 font-medium">Enable or disable payment gateways available for customers.</p>
+                          </div>
+                          
+                          <div className="p-6 md:p-8 space-y-6">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                  {/* Credit Card */}
+                                  <div className={`p-6 rounded-2xl border-2 transition-colors ${paymentMethods?.card ? 'border-primary bg-blue-50/50' : 'border-slate-200 bg-slate-50 opacity-70'}`}>
+                                      <div className="flex justify-between items-center mb-4">
+                                          <div className="flex items-center space-x-3">
+                                              <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${paymentMethods?.card ? 'bg-primary text-white' : 'bg-slate-200 text-slate-400'}`}>
+                                                  <CreditCard className="w-6 h-6" />
+                                              </div>
+                                              <div>
+                                                  <h3 className="font-bold text-slate-900 text-lg">Credit / Debit Card</h3>
+                                                  <span className={`text-xs font-bold uppercase tracking-wider ${paymentMethods?.card ? 'text-green-600' : 'text-slate-500'}`}>
+                                                      {paymentMethods?.card ? 'Active' : 'Disabled'}
+                                                  </span>
+                                              </div>
+                                          </div>
+                                          <button onClick={async () => {
+                                              const newMethods = { ...paymentMethods, card: !paymentMethods?.card };
+                                              setPaymentMethods(newMethods);
+                                              await savePaymentMethodsConfig(newMethods);
+                                          }}>
+                                              {paymentMethods?.card ? <ToggleRight className="w-10 h-10 text-primary" /> : <ToggleLeft className="w-10 h-10 text-slate-400" />}
+                                          </button>
+                                      </div>
+                                      <p className="text-sm text-slate-600">Accept global payments via Visa, Mastercard, and Amex securely via Stripe.</p>
+                                  </div>
+
+                                  {/* bKash */}
+                                  <div className={`p-6 rounded-2xl border-2 transition-colors ${paymentMethods?.bkash ? 'border-pink-500 bg-pink-50/50' : 'border-slate-200 bg-slate-50 opacity-70'}`}>
+                                      <div className="flex justify-between items-center mb-4">
+                                          <div className="flex items-center space-x-3">
+                                              <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${paymentMethods?.bkash ? 'bg-pink-500 text-white' : 'bg-slate-200 text-slate-400'}`}>
+                                                  <DollarSign className="w-6 h-6" />
+                                              </div>
+                                              <div>
+                                                  <h3 className="font-bold text-slate-900 text-lg">bKash</h3>
+                                                  <span className={`text-xs font-bold uppercase tracking-wider ${paymentMethods?.bkash ? 'text-green-600' : 'text-slate-500'}`}>
+                                                      {paymentMethods?.bkash ? 'Active' : 'Disabled'}
+                                                  </span>
+                                              </div>
+                                          </div>
+                                          <button onClick={async () => {
+                                              const newMethods = { ...paymentMethods, bkash: !paymentMethods?.bkash };
+                                              setPaymentMethods(newMethods);
+                                              await savePaymentMethodsConfig(newMethods);
+                                          }}>
+                                              {paymentMethods?.bkash ? <ToggleRight className="w-10 h-10 text-pink-500" /> : <ToggleLeft className="w-10 h-10 text-slate-400" />}
+                                          </button>
+                                      </div>
+                                      <p className="text-sm text-slate-600">Accept local mobile wallet payments from Bangladesh via bKash gateway.</p>
+                                  </div>
+                              </div>
+                          </div>
+                      </div>
+                  </motion.div>
+              );
           case 'settings':
               return (
                   <motion.div initial={{opacity: 0, scale: 0.98}} animate={{opacity: 1, scale: 1}} className="max-w-4xl">
@@ -489,6 +602,32 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
                           </div>
                           
                           <div className="p-6 md:p-8 space-y-10">
+                              {/* Features / Modules */}
+                              <section>
+                                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 cursor-pointer hover:border-primary/50 transition-colors" onClick={() => { setModalType('modules'); setFormData({}); setModalOpen(true); }}>
+                                      <div>
+                                          <h3 className="text-lg font-bold text-slate-900 flex items-center mb-1">
+                                              <Settings className="w-5 h-5 mr-2 text-primary" /> Active Modules
+                                          </h3>
+                                          <p className="text-sm text-slate-500">Enable or disable various sections and functionalities of your website.</p>
+                                      </div>
+                                      <button className="bg-white border border-slate-200 text-slate-900 px-4 py-2 rounded-xl text-sm font-bold shadow-sm hover:bg-slate-50">Manage Modules</button>
+                                  </div>
+                              </section>
+
+                              {/* Navigation / Bar Control */}
+                              <section>
+                                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 cursor-pointer hover:border-primary/50 transition-colors" onClick={() => { setModalType('navbar'); setFormData({}); setModalOpen(true); }}>
+                                      <div>
+                                          <h3 className="text-lg font-bold text-slate-900 flex items-center mb-1">
+                                              <Menu className="w-5 h-5 mr-2 text-primary" /> Navigation Bar Control
+                                          </h3>
+                                          <p className="text-sm text-slate-500">Toggle which items are visible on the website's top and footer navigation menus.</p>
+                                      </div>
+                                      <button className="bg-white border border-slate-200 text-slate-900 px-4 py-2 rounded-xl text-sm font-bold shadow-sm hover:bg-slate-50">Manage Navigation</button>
+                                  </div>
+                              </section>
+
                               {/* Branding */}
                               <section>
                                   <h3 className="text-lg font-bold text-slate-900 flex items-center mb-6">
@@ -1182,17 +1321,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
     <div className="min-h-screen bg-slate-50 flex font-sans">
       {/* Sidebar Overlay for Mobile */}
       <AnimatePresence>
-      {!isSidebarOpen && (
+      {isSidebarOpen && (
          <motion.div 
             initial={{opacity: 0}} animate={{opacity: 1}} exit={{opacity: 0}}
             className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-30 lg:hidden"
-            onClick={() => setSidebarOpen(true)}
+            onClick={() => setSidebarOpen(false)}
          />
       )}
       </AnimatePresence>
 
       {/* Sidebar */}
-      <aside className={`fixed inset-y-0 left-0 bg-slate-900 z-40 w-72 transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 flex flex-col shadow-2xl border-r border-slate-800`}>
+      <aside className={`fixed inset-y-0 left-0 bg-slate-900 z-40 w-72 transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} flex flex-col shadow-2xl border-r border-slate-800`}>
           <div className="h-20 flex items-center px-6 border-b border-slate-800 bg-slate-900 justify-between">
               <div className="flex items-center">
                   <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center mr-3 shrink-0 shadow-lg shadow-primary/30">
@@ -1295,10 +1434,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
             <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
                 <motion.div initial={{scale:0.95}} animate={{scale:1}} exit={{scale:0.95}} className="bg-white rounded-3xl shadow-xl border border-slate-100 max-w-lg w-full overflow-hidden">
                     <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-                        <h3 className="text-xl font-bold font-serif text-slate-800 capitalize">Add New {modalType}</h3>
+                        <h3 className="text-xl font-bold font-serif text-slate-800 capitalize">{modalType === 'modules' ? 'Manage Website Modules' : modalType === 'navbar' ? 'Manage Navigation' : `Add New ${modalType}`}</h3>
                         <button onClick={() => setModalOpen(false)} className="text-slate-400 hover:text-slate-600 transition"><X className="w-6 h-6" /></button>
                     </div>
-                    <div className="p-6 space-y-4">
+                    <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto custom-scrollbar">
                         {modalType === 'hotel' && (
                             <>
                                 <div><label className="text-sm font-bold text-slate-700 block mb-1">Hotel Title</label><input type="text" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 font-medium" placeholder="E.g. Grand Plaza" value={formData.title} onChange={e=>setFormData({...formData, title: e.target.value})} /></div>
@@ -1350,7 +1489,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
                                 <div><label className="text-sm font-bold text-slate-700 block mb-1">City</label><input type="text" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 font-medium" placeholder="E.g. Cox's Bazar" value={formData.city} onChange={e=>setFormData({...formData, city: e.target.value})} /></div>
                                 <div><label className="text-sm font-bold text-slate-700 block mb-1">Country</label><input type="text" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 font-medium" placeholder="E.g. Bangladesh" value={formData.country} onChange={e=>setFormData({...formData, country: e.target.value})} /></div>
                                 <div><label className="text-sm font-bold text-slate-700 block mb-1">Price Label</label><input type="text" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 font-medium" placeholder="Starts from ৳4,500" value={formData.price} onChange={e=>setFormData({...formData, price: e.target.value})} /></div>
-                                <div><label className="text-sm font-bold text-slate-700 block mb-1">Image URL</label><input type="url" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 font-medium" placeholder="https://" value={formData.image || ''} onChange={e=>setFormData({...formData, image: e.target.value})} /></div>
+                                <div>
+                                    <label className="text-sm font-bold text-slate-700 block mb-1">Image URL or Upload</label>
+                                    <div className="flex gap-2">
+                                        <input type="url" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 font-medium" placeholder="https://" value={formData.image || ''} onChange={e=>setFormData({...formData, image: e.target.value})} />
+                                        <label className="cursor-pointer bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-2 px-4 rounded-xl flex items-center justify-center transition whitespace-nowrap">
+                                            {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                                            <span className="sr-only">Upload Image</span>
+                                            <input type="file" className="hidden" accept="image/*" onChange={handleModalImageUpload} disabled={uploading} />
+                                        </label>
+                                    </div>
+                                </div>
                             </>
                         )}
                         {modalType === 'flight' && (
@@ -1364,16 +1513,85 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
                                 <div><label className="text-sm font-bold text-slate-700 block mb-1">Stops</label><input type="number" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 font-medium" placeholder="0" value={formData.stops} onChange={e=>setFormData({...formData, stops: e.target.value})} /></div>
                             </>
                         )}
-                        {!['career', 'press', 'destination', 'flight'].includes(modalType) && (
-                            <div><label className="text-sm font-bold text-slate-700 block mb-1">Image URL</label><input type="url" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 font-medium" placeholder="https://" value={formData.imageUrl || ''} onChange={e=>setFormData({...formData, imageUrl: e.target.value})} /></div>
+                        {modalType === 'modules' && (
+                            <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-2">
+                                <div>
+                                    <h3 className="font-bold text-slate-800 text-lg mb-4">Core Modules</h3>
+                                    <div className="space-y-4">
+                                        {[
+                                            { key: 'flightsEnabled', label: 'Flight Booking Module' },
+                                            { key: 'hotelsEnabled', label: 'Hotel Booking Module' },
+                                            { key: 'holidaysEnabled', label: 'Holiday Packages Module' },
+                                            { key: 'visaEnabled', label: 'Visa Services Module' },
+                                            { key: 'destinationsEnabled', label: 'Destinations Module' },
+                                            { key: 'blogEnabled', label: 'Travel Blog Module' },
+                                            { key: 'careersEnabled', label: 'Careers Module' },
+                                            { key: 'pressEnabled', label: 'Press & Media Module' },
+                                        ].map(({ key, label }) => (
+                                            <div key={key} className="flex justify-between items-center p-3 bg-white border border-slate-200 rounded-xl">
+                                                <span className="font-bold text-slate-800">{label}</span>
+                                                <button onClick={() => setFeaturesConfig({ ...featuresConfig, [key]: !featuresConfig[key] })}>
+                                                    {featuresConfig[key] ? <ToggleRight className="w-8 h-8 text-primary" /> : <ToggleLeft className="w-8 h-8 text-slate-400" />}
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
                         )}
-                        {!['blog', 'press', 'destination', 'flight'].includes(modalType) && (
-                            <div><label className="text-sm font-bold text-slate-700 block mb-1">Description</label><textarea className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 font-medium h-24 resize-none" placeholder="Enter details..." value={formData.description || ''} onChange={e=>setFormData({...formData, description: e.target.value})}></textarea></div>
+                        {modalType === 'navbar' && (
+                            <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-2">
+                                <div>
+                                    <h3 className="font-bold text-slate-800 text-lg mb-4">Top Navigation Bar visibility</h3>
+                                    <p className="text-sm text-slate-500 mb-4">Toggle which modules are visible in the top header navigation bar.</p>
+                                    <div className="space-y-4">
+                                        {[
+                                            { key: 'topNavHomeEnabled', label: 'Home', default: true },
+                                            { key: 'topNavHotelsEnabled', label: 'Hotels', default: true },
+                                            { key: 'topNavHolidaysEnabled', label: 'Holidays', default: true },
+                                            { key: 'topNavVisaEnabled', label: 'Visa', default: true },
+                                            { key: 'topNavAboutEnabled', label: 'About Us', default: false },
+                                            { key: 'topNavCareersEnabled', label: 'Careers', default: false },
+                                            { key: 'topNavPressEnabled', label: 'Press & Media', default: false },
+                                            { key: 'topNavBlogEnabled', label: 'Travel Blog', default: false },
+                                            { key: 'topNavHelpEnabled', label: 'Help Center', default: false },
+                                            { key: 'topNavPrivacyEnabled', label: 'Privacy Policy', default: false },
+                                            { key: 'topNavTermsEnabled', label: 'Terms of Service', default: false },
+                                            { key: 'topNavRefundEnabled', label: 'Refund Rules', default: false },
+                                        ].map(({ key, label, default: def }) => {
+                                            const isEnabled = featuresConfig[key] !== undefined ? featuresConfig[key] : def;
+                                            return (
+                                            <div key={key} className="flex justify-between items-center p-3 bg-white border border-slate-200 rounded-xl">
+                                                <span className="font-bold text-slate-800">{label}</span>
+                                                <button onClick={() => setFeaturesConfig({ ...featuresConfig, [key]: !isEnabled })}>
+                                                    {isEnabled ? <ToggleRight className="w-8 h-8 text-primary" /> : <ToggleLeft className="w-8 h-8 text-slate-400" />}
+                                                </button>
+                                            </div>
+                                        )})}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        {!['career', 'press', 'destination', 'flight', 'modules', 'navbar'].includes(modalType) && (
+                            <div>
+                                <label className="text-sm font-bold text-slate-700 block mb-1">Image URL or Upload</label>
+                                <div className="flex gap-2">
+                                    <input type="url" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 font-medium" placeholder="https://" value={formData.imageUrl || ''} onChange={e=>setFormData({...formData, imageUrl: e.target.value})} />
+                                    <label className="cursor-pointer bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-2 px-4 rounded-xl flex items-center justify-center transition whitespace-nowrap">
+                                        {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                                        <span className="sr-only">Upload Image</span>
+                                        <input type="file" className="hidden" accept="image/*" onChange={handleModalImageUpload} disabled={uploading} />
+                                    </label>
+                                </div>
+                            </div>
+                        )}
+                        {!['blog', 'destination', 'flight', 'modules', 'navbar'].includes(modalType) && (
+                            <div><label className="text-sm font-bold text-slate-700 block mb-1">Description / Content</label><textarea className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 font-medium h-24 resize-none" placeholder="Enter details..." value={formData.description || ''} onChange={e=>setFormData({...formData, description: e.target.value})}></textarea></div>
                         )}
                     </div>
                     <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
                         <button onClick={() => setModalOpen(false)} className="px-5 py-2.5 rounded-xl font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 transition">Cancel</button>
-                        <button onClick={handleCreateSubmit} className="px-5 py-2.5 rounded-xl font-bold text-white bg-slate-900 hover:bg-slate-800 transition">Create {modalType}</button>
+                        <button onClick={handleCreateSubmit} className="px-5 py-2.5 rounded-xl font-bold text-white bg-slate-900 hover:bg-slate-800 transition">{(modalType === 'modules' || modalType === 'navbar') ? 'Save Changes' : `Create ${modalType}`}</button>
                     </div>
                 </motion.div>
             </motion.div>

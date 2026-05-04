@@ -1,0 +1,35 @@
+import React from 'react';
+
+export const FeaturesContext = React.createContext<{ 
+    topNavHomeEnabled?: boolean;
+    topNavHotelsEnabled?: boolean;
+    topNavHolidaysEnabled?: boolean;
+    topNavVisaEnabled?: boolean;
+    topNavAboutEnabled?: boolean;
+    topNavCareersEnabled?: boolean;
+    topNavPressEnabled?: boolean;
+    topNavBlogEnabled?: boolean;
+    topNavHelpEnabled?: boolean;
+    topNavPrivacyEnabled?: boolean;
+    topNavTermsEnabled?: boolean;
+    topNavRefundEnabled?: boolean;
+    navHomeEnabled?: boolean;
+    navHotelsEnabled?: boolean;
+    navHolidaysEnabled?: boolean;
+    navVisaEnabled?: boolean;
+    navAboutEnabled?: boolean;
+    navCareersEnabled?: boolean;
+    navPressEnabled?: boolean;
+    navBlogEnabled?: boolean;
+    navHelpEnabled?: boolean;
+    navPrivacyEnabled?: boolean;
+    navTermsEnabled?: boolean;
+    navRefundEnabled?: boolean;
+    hotelsEnabled?: boolean;
+    holidaysEnabled?: boolean;
+    visaEnabled?: boolean;
+    destinationsEnabled?: boolean;
+    blogEnabled?: boolean;
+    careersEnabled?: boolean;
+    pressEnabled?: boolean;
+}>({});

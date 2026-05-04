@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { SearchParams, Airport, FlightClass, TripType, AIRecommendation, HotelSearchParams } from '../types';
+import { SearchParams, Airport, FlightClass, TripType, HotelSearchParams } from '../types';
 import { AIRPORTS } from '../services/mockApi';
-import { Search, Calendar, MapPin, Sparkles, TrendingUp, ShieldCheck, Phone, BedDouble, Plane, Star, ArrowRight, Map, Globe2, Quote } from 'lucide-react';
-import { getDestinationRecommendations } from '../services/geminiService';
-import { getDestinations } from '../services/firebaseService';
+import { Search, Calendar, MapPin, Sparkles, TrendingUp, ShieldCheck, Phone, BedDouble, Plane, Star, ArrowRight, Map, Globe2, Quote, AlertCircle } from 'lucide-react';
+import { getDestinations, getBlogPosts } from '../services/firebaseService';
 import { motion } from 'motion/react';
+import { BlogReaderModal } from '../components/BlogReaderModal';
+import { FeaturesContext } from '../context/FeaturesContext';
 
 interface HomePageProps {
   onSearch: (params: SearchParams) => void;
@@ -25,15 +26,28 @@ const PARTNERS = [
 
 const HomePage: React.FC<HomePageProps> = ({ onSearch, onHotelSearch }) => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'flights' | 'hotels'>('flights');
+  const features = useContext(FeaturesContext);
+  const [activeTab, setActiveTab] = useState<'flights' | 'hotels'>(features.flightsEnabled ? 'flights' : 'hotels');
   
   // Destinations State
   const [destinations, setDestinations] = useState<any[]>([]);
+  
+  // Blog State
+  const [blogs, setBlogs] = useState<any[]>([]);
+  const [selectedBlog, setSelectedBlog] = useState<any>(null);
 
   useEffect(() => {
     getDestinations().then(data => {
       if (data) {
         setDestinations(data);
+      }
+    }).catch(err => console.error(err));
+
+    getBlogPosts().then(data => {
+      if (data && data.length > 0) {
+        setBlogs(data.sort((a: any, b: any) => b.createdAt - a.createdAt).slice(0, 3));
+      } else {
+        setBlogs([{id: '1', title: 'Top 10 Destinations for 2026', author: 'HQ Editors', publishedAt: 'January 1, 2026', excerpt: 'Discover the hidden gems and trending spots you must visit this year.', imageUrl: 'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=800'}]);
       }
     }).catch(err => console.error(err));
   }, []);
@@ -42,15 +56,21 @@ const HomePage: React.FC<HomePageProps> = ({ onSearch, onHotelSearch }) => {
   const [from, setFrom] = useState('DAC');
   const [to, setTo] = useState('CXB');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [returnDate, setReturnDate] = useState('');
   const [passengers, setPassengers] = useState(1);
+  const [tripType, setTripType] = useState<TripType>(TripType.ONE_WAY);
+  const [flightClass, setFlightClass] = useState<FlightClass>(FlightClass.ECONOMY);
+
+  const swapLocations = () => {
+    setFrom(to);
+    setTo(from);
+  };
   
   // Hotel State
   const [hotelCity, setHotelCity] = useState('Dhaka');
   const [hotelCheckIn, setHotelCheckIn] = useState(new Date().toISOString().split('T')[0]);
+  const [hotelCheckOut, setHotelCheckOut] = useState('');
   const [hotelGuests, setHotelGuests] = useState(2);
-
-  const [aiRec, setAiRec] = useState<AIRecommendation | null>(null);
-  const [loadingAi, setLoadingAi] = useState(false);
 
   const handleFlightSearch = () => {
     onSearch({
@@ -58,8 +78,8 @@ const HomePage: React.FC<HomePageProps> = ({ onSearch, onHotelSearch }) => {
       to,
       date,
       passengers,
-      class: FlightClass.ECONOMY,
-      tripType: TripType.ONE_WAY
+      class: flightClass,
+      tripType
     });
   };
 
@@ -70,26 +90,6 @@ const HomePage: React.FC<HomePageProps> = ({ onSearch, onHotelSearch }) => {
         guests: hotelGuests
     });
   };
-
-  useEffect(() => {
-    let isMounted = true;
-    const fetchAi = async () => {
-        const destAirport = AIRPORTS.find(a => a.code === to);
-        if (destAirport) {
-            setLoadingAi(true);
-            const rec = await getDestinationRecommendations(destAirport.city);
-            if (isMounted) {
-                setAiRec(rec);
-                setLoadingAi(false);
-            }
-        }
-    };
-    const timer = setTimeout(fetchAi, 1000);
-    return () => {
-        isMounted = false;
-        clearTimeout(timer);
-    };
-  }, [to]);
 
   return (
     <div className="relative bg-white">
@@ -136,127 +136,211 @@ const HomePage: React.FC<HomePageProps> = ({ onSearch, onHotelSearch }) => {
         <div className="bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-100">
             {/* Tabs */}
             <div className="flex border-b bg-slate-50">
-                <button 
-                    onClick={() => setActiveTab('flights')}
-                    className={`flex-1 py-5 flex items-center justify-center text-lg font-bold transition-all duration-300 ${activeTab === 'flights' ? 'bg-white text-primary border-t-4 border-t-primary shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100 border-t-4 border-t-transparent'}`}
-                >
-                    <Plane className="w-5 h-5 mr-3" /> Search Flights
-                </button>
-                <button 
-                    onClick={() => setActiveTab('hotels')}
-                    className={`flex-1 py-5 flex items-center justify-center text-lg font-bold transition-all duration-300 ${activeTab === 'hotels' ? 'bg-white text-secondary border-t-4 border-t-secondary shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100 border-t-4 border-t-transparent'}`}
-                >
-                    <BedDouble className="w-5 h-5 mr-3" /> Search Hotels
-                </button>
+                {features.flightsEnabled && (
+                    <button 
+                        onClick={() => setActiveTab('flights')}
+                        className={`flex-1 py-5 flex items-center justify-center text-lg font-bold transition-all duration-300 ${activeTab === 'flights' ? 'bg-white text-primary border-t-4 border-t-primary shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100 border-t-4 border-t-transparent'}`}
+                    >
+                        <Plane className="w-5 h-5 mr-3" /> Search Flights
+                    </button>
+                )}
+                {features.hotelsEnabled && (
+                    <button 
+                        onClick={() => setActiveTab('hotels')}
+                        className={`flex-1 py-5 flex items-center justify-center text-lg font-bold transition-all duration-300 ${activeTab === 'hotels' ? 'bg-white text-secondary border-t-4 border-t-secondary shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100 border-t-4 border-t-transparent'}`}
+                    >
+                        <BedDouble className="w-5 h-5 mr-3" /> Search Hotels
+                    </button>
+                )}
             </div>
 
             <div className="p-6 md:p-10">
             {activeTab === 'flights' ? (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
-                    <div className="flex flex-wrap space-x-6 mb-8 border-b pb-4">
-                        <label className="flex items-center space-x-2 cursor-pointer text-primary font-bold">
-                            <input type="radio" name="trip" defaultChecked className="text-primary w-4 h-4" />
-                            <span>One Way</span>
-                        </label>
-                        <label className="flex items-center space-x-2 cursor-pointer text-slate-500 hover:text-primary transition font-medium">
-                            <input type="radio" name="trip" className="text-primary w-4 h-4" />
-                            <span>Round Trip</span>
-                        </label>
-                        <label className="flex items-center space-x-2 cursor-pointer text-slate-500 hover:text-primary transition font-medium">
-                            <input type="radio" name="trip" className="text-primary w-4 h-4" />
-                            <span>Multi-City</span>
-                        </label>
+                    {!features.flightsEnabled ? (
+                        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-8 text-center flex flex-col items-center justify-center min-h-[150px]">
+                            <AlertCircle className="w-12 h-12 text-slate-400 mb-4" />
+                            <h3 className="text-xl font-bold text-slate-900 mb-2">Flight Booking Currently Unavailable</h3>
+                            <p className="text-slate-500 max-w-md">We are currently updating our flight inventory systems to offer you better deals. Please check back later.</p>
+                        </div>
+                    ) : (
+                        <>
+                            <div className="flex flex-wrap items-center justify-between space-y-4 md:space-y-0 mb-8 border-b pb-4">
+                                <div className="flex space-x-6">
+                                    <label className={`flex items-center space-x-2 cursor-pointer font-bold transition ${tripType === TripType.ONE_WAY ? 'text-primary' : 'text-slate-500 hover:text-primary'}`}>
+                                        <input type="radio" name="trip" checked={tripType === TripType.ONE_WAY} onChange={() => setTripType(TripType.ONE_WAY)} className="text-primary w-4 h-4" />
+                                        <span>One Way</span>
+                                    </label>
+                                    <label className={`flex items-center space-x-2 cursor-pointer font-bold transition ${tripType === TripType.ROUND_TRIP ? 'text-primary' : 'text-slate-500 hover:text-primary'}`}>
+                                        <input type="radio" name="trip" checked={tripType === TripType.ROUND_TRIP} onChange={() => setTripType(TripType.ROUND_TRIP)} className="text-primary w-4 h-4" />
+                                        <span>Round Trip</span>
+                                    </label>
+                                    <label className={`flex items-center space-x-2 cursor-pointer font-bold transition ${tripType === TripType.MULTI_CITY ? 'text-primary' : 'text-slate-500 hover:text-primary'}`}>
+                                        <input type="radio" name="trip" checked={tripType === TripType.MULTI_CITY} onChange={() => setTripType(TripType.MULTI_CITY)} className="text-primary w-4 h-4" />
+                                        <span>Multi-City</span>
+                                    </label>
+                                </div>
+                        <div className="flex space-x-4">
+                            <select 
+                                value={passengers} 
+                                onChange={e => setPassengers(Number(e.target.value))}
+                                className="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-primary focus:border-primary block p-2.5 outline-none font-medium cursor-pointer"
+                            >
+                                {[1, 2, 3, 4, 5, 6].map(n => <option key={n} value={n}>{n} Passenger{n > 1 ? 's' : ''}</option>)}
+                            </select>
+                            <select 
+                                value={flightClass} 
+                                onChange={e => setFlightClass(e.target.value as FlightClass)}
+                                className="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-primary focus:border-primary block p-2.5 outline-none font-medium cursor-pointer"
+                            >
+                                <option value={FlightClass.ECONOMY}>Economy</option>
+                                <option value={FlightClass.BUSINESS}>Business</option>
+                                <option value={FlightClass.FIRST}>First Class</option>
+                            </select>
+                        </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
-                        <div className="md:col-span-3 relative border-2 border-slate-200 rounded-xl p-3 hover:border-primary transition-colors focus-within:border-primary focus-within:ring-4 focus-within:ring-blue-50 group bg-white">
-                            <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 block mb-1 group-focus-within:text-primary">Leaving From</label>
-                            <div className="flex items-center">
-                                <MapPin className="w-5 h-5 text-slate-400 mr-2 group-focus-within:text-primary" />
-                                <select 
-                                  className="w-full bg-transparent font-bold text-lg outline-none text-slate-800 appearance-none cursor-pointer"
-                                  value={from}
-                                  onChange={(e) => setFrom(e.target.value)}
-                                >
-                                {AIRPORTS.map(a => <option key={a.code} value={a.code}>{a.city} ({a.code})</option>)}
-                                </select>
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-2 relative">
+                        {/* Locations (From/To) */}
+                        <div className="lg:col-span-5 grid grid-cols-1 md:grid-cols-2 gap-2 relative">
+                            <div className="relative border border-slate-300 rounded-xl p-3 hover:border-primary transition-colors focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 group bg-white shadow-sm h-[72px] flex flex-col justify-center">
+                                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block group-focus-within:text-primary">Leaving From</label>
+                                <div className="flex items-center">
+                                    <select 
+                                      className="w-full bg-transparent font-bold text-lg md:text-xl outline-none text-slate-900 appearance-none cursor-pointer truncate"
+                                      value={from}
+                                      onChange={(e) => setFrom(e.target.value)}
+                                    >
+                                    {AIRPORTS.map(a => <option key={a.code} value={a.code}>{a.city} ({a.code})</option>)}
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            {/* Swap Button */}
+                            <button 
+                                onClick={swapLocations}
+                                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 md:w-10 md:h-10 bg-white border border-slate-200 rounded-full flex items-center justify-center text-primary shadow-md hover:bg-slate-50 hover:scale-110 active:scale-95 transition-all z-10 hidden md:flex"
+                            >
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-5 h-5">
+                                    <path d="M17 4V14M17 14L13 10M17 14L21 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                    <path d="M7 20V10M7 10L3 14M7 10L11 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                            </button>
+
+                            <div className="relative border border-slate-300 rounded-xl p-3 hover:border-primary transition-colors focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 group bg-white shadow-sm h-[72px] flex flex-col justify-center">
+                                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block group-focus-within:text-primary">Going To</label>
+                                <div className="flex items-center">
+                                    <select 
+                                      className="w-full bg-transparent font-bold text-lg md:text-xl outline-none text-slate-900 appearance-none cursor-pointer truncate"
+                                      value={to}
+                                      onChange={(e) => setTo(e.target.value)}
+                                    >
+                                    {AIRPORTS.filter(a => a.code !== from).map(a => <option key={a.code} value={a.code}>{a.city} ({a.code})</option>)}
+                                    </select>
+                                </div>
                             </div>
                         </div>
 
-                        <div className="md:col-span-3 relative border-2 border-slate-200 rounded-xl p-3 hover:border-primary transition-colors focus-within:border-primary focus-within:ring-4 focus-within:ring-blue-50 group bg-white">
-                            <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 block mb-1 group-focus-within:text-primary">Going To</label>
-                            <div className="flex items-center">
-                                <MapPin className="w-5 h-5 text-slate-400 mr-2 group-focus-within:text-primary" />
-                                <select 
-                                  className="w-full bg-transparent font-bold text-lg outline-none text-slate-800 appearance-none cursor-pointer"
-                                  value={to}
-                                  onChange={(e) => setTo(e.target.value)}
-                                >
-                                {AIRPORTS.filter(a => a.code !== from).map(a => <option key={a.code} value={a.code}>{a.city} ({a.code})</option>)}
-                                </select>
+                        {/* Dates */}
+                        <div className={`lg:col-span-5 grid grid-cols-1 ${tripType === TripType.ROUND_TRIP ? 'md:grid-cols-2' : 'md:grid-cols-1'} gap-2`}>
+                            <div className="border border-slate-300 rounded-xl p-3 hover:border-primary transition-colors focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 group bg-white shadow-sm h-[72px] flex flex-col justify-center">
+                                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block group-focus-within:text-primary">Journey Date</label>
+                                <div className="flex items-center">
+                                    <input 
+                                      type="date" 
+                                      className="w-full bg-transparent font-bold text-lg md:text-xl outline-none text-slate-900 cursor-pointer"
+                                      value={date}
+                                      min={new Date().toISOString().split('T')[0]}
+                                      onChange={(e) => setDate(e.target.value)}
+                                    />
+                                </div>
                             </div>
+                            
+                            {tripType === TripType.ROUND_TRIP && (
+                                <div className="border border-slate-300 rounded-xl p-3 hover:border-primary transition-colors focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 group bg-white shadow-sm h-[72px] flex flex-col justify-center">
+                                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block group-focus-within:text-primary">Return Date</label>
+                                    <div className="flex items-center">
+                                        <input 
+                                        type="date" 
+                                        className="w-full bg-transparent font-bold text-lg md:text-xl outline-none text-slate-900 cursor-pointer"
+                                        value={returnDate}
+                                        min={date}
+                                        onChange={(e) => setReturnDate(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
-                        <div className="md:col-span-3 border-2 border-slate-200 rounded-xl p-3 hover:border-primary transition-colors focus-within:border-primary focus-within:ring-4 focus-within:ring-blue-50 group bg-white">
-                            <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 block mb-1 group-focus-within:text-primary">Journey Date</label>
-                            <div className="flex items-center">
-                                <Calendar className="w-5 h-5 text-slate-400 mr-2 group-focus-within:text-primary" />
-                                <input 
-                                  type="date" 
-                                  className="w-full bg-transparent font-bold text-lg outline-none text-slate-800 cursor-pointer"
-                                  value={date}
-                                  onChange={(e) => setDate(e.target.value)}
-                                />
-                            </div>
-                        </div>
-
-                        <div className="md:col-span-3 flex items-center">
+                        {/* Button */}
+                        <div className="lg:col-span-2">
                             <button 
                                 onClick={handleFlightSearch}
-                                className="w-full h-full bg-primary hover:bg-blue-700 text-white font-bold text-lg rounded-xl shadow-[0_8px_20px_-6px_rgba(0,108,228,0.5)] transition transform hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center min-h-[72px]"
+                                className="w-full h-full bg-primary hover:bg-blue-700 text-white font-bold text-lg rounded-xl shadow-lg shadow-primary/30 transition transform hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center min-h-[72px]"
                             >
                                 <Search className="w-6 h-6 mr-2" />
-                                Find Flights
+                                Search
                             </button>
                         </div>
                     </div>
+                    </>
+                    )}
                 </motion.div>
             ) : (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
-                     <div className="grid grid-cols-1 md:grid-cols-12 gap-5 mt-2">
-                        <div className="md:col-span-4 relative border-2 border-slate-200 rounded-xl p-3 hover:border-secondary transition-colors focus-within:border-secondary focus-within:ring-4 focus-within:ring-orange-50 group bg-white">
-                            <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 block mb-1 group-focus-within:text-secondary">Destination</label>
-                            <div className="flex items-center">
-                                <MapPin className="w-5 h-5 text-slate-400 mr-2 group-focus-within:text-secondary" />
-                                <input 
-                                    type="text"
-                                    className="w-full bg-transparent font-bold text-lg outline-none text-slate-800"
-                                    value={hotelCity}
-                                    onChange={(e) => setHotelCity(e.target.value)}
-                                    placeholder="Where are you going?"
-                                />
+                    {!features.hotelsEnabled ? (
+                        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-8 text-center flex flex-col items-center justify-center min-h-[150px]">
+                            <AlertCircle className="w-12 h-12 text-slate-400 mb-4" />
+                            <h3 className="text-xl font-bold text-slate-900 mb-2">Hotel Booking Currently Unavailable</h3>
+                            <p className="text-slate-500 max-w-md">We are currently upgrading our hotel partners network. Please check back later for exciting new stays and offers.</p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-2 relative">
+                            <div className="lg:col-span-4 relative border border-slate-300 rounded-xl p-3 hover:border-secondary transition-colors focus-within:border-secondary focus-within:ring-2 focus-within:ring-secondary/20 group bg-white shadow-sm h-[72px] flex flex-col justify-center">
+                                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block group-focus-within:text-secondary">Destination or Property</label>
+                                <div className="flex items-center">
+                                    <input 
+                                        type="text"
+                                        className="w-full bg-transparent font-bold text-lg md:text-xl outline-none text-slate-900 placeholder:text-slate-400 placeholder:font-normal"
+                                        value={hotelCity}
+                                        onChange={(e) => setHotelCity(e.target.value)}
+                                        placeholder="e.g. Dubai"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="lg:col-span-4 grid grid-cols-2 gap-2">
+                                <div className="border border-slate-300 rounded-xl p-3 hover:border-secondary transition-colors focus-within:border-secondary focus-within:ring-2 focus-within:ring-secondary/20 group bg-white shadow-sm h-[72px] flex flex-col justify-center">
+                                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block group-focus-within:text-secondary">Check-In</label>
+                                <div className="flex items-center">
+                                    <input 
+                                    type="date" 
+                                    className="w-full bg-transparent font-bold text-lg md:text-xl outline-none text-slate-900 cursor-pointer"
+                                    value={hotelCheckIn}
+                                    min={new Date().toISOString().split('T')[0]}
+                                    onChange={(e) => setHotelCheckIn(e.target.value)}
+                                    />
+                                </div>
+                            </div>
+                            <div className="border border-slate-300 rounded-xl p-3 hover:border-secondary transition-colors focus-within:border-secondary focus-within:ring-2 focus-within:ring-secondary/20 group bg-white shadow-sm h-[72px] flex flex-col justify-center">
+                                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block group-focus-within:text-secondary">Check-Out</label>
+                                <div className="flex items-center">
+                                    <input 
+                                    type="date" 
+                                    className="w-full bg-transparent font-bold text-lg md:text-xl outline-none text-slate-900 cursor-pointer"
+                                    value={hotelCheckOut}
+                                    min={hotelCheckIn}
+                                    onChange={(e) => setHotelCheckOut(e.target.value)}
+                                    />
+                                </div>
                             </div>
                         </div>
 
-                        <div className="md:col-span-3 border-2 border-slate-200 rounded-xl p-3 hover:border-secondary transition-colors focus-within:border-secondary focus-within:ring-4 focus-within:ring-orange-50 group bg-white">
-                            <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 block mb-1 group-focus-within:text-secondary">Check-In</label>
+                        <div className="lg:col-span-2 border border-slate-300 rounded-xl p-3 hover:border-secondary transition-colors focus-within:border-secondary focus-within:ring-2 focus-within:ring-secondary/20 group bg-white shadow-sm h-[72px] flex flex-col justify-center">
+                            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block group-focus-within:text-secondary">Guests & Rooms</label>
                             <div className="flex items-center">
-                                <Calendar className="w-5 h-5 text-slate-400 mr-2 group-focus-within:text-secondary" />
-                                <input 
-                                  type="date" 
-                                  className="w-full bg-transparent font-bold text-lg outline-none text-slate-800 cursor-pointer"
-                                  value={hotelCheckIn}
-                                  onChange={(e) => setHotelCheckIn(e.target.value)}
-                                />
-                            </div>
-                        </div>
-
-                         <div className="md:col-span-2 border-2 border-slate-200 rounded-xl p-3 hover:border-secondary transition-colors focus-within:border-secondary focus-within:ring-4 focus-within:ring-orange-50 group bg-white">
-                            <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 block mb-1 group-focus-within:text-secondary">Guests</label>
-                            <div className="flex items-center">
-                                <BedDouble className="w-5 h-5 text-slate-400 mr-2 group-focus-within:text-secondary" />
                                 <select 
-                                    className="w-full bg-transparent font-bold text-lg outline-none text-slate-800 cursor-pointer appearance-none"
+                                    className="w-full bg-transparent font-bold text-lg md:text-xl outline-none text-slate-900 cursor-pointer appearance-none"
                                     value={hotelGuests}
                                     onChange={(e) => setHotelGuests(Number(e.target.value))}
                                 >
@@ -265,16 +349,17 @@ const HomePage: React.FC<HomePageProps> = ({ onSearch, onHotelSearch }) => {
                             </div>
                         </div>
 
-                        <div className="md:col-span-3 flex items-center">
+                        <div className="lg:col-span-2 flex items-center">
                             <button 
                                 onClick={handleHotelSearch}
-                                className="w-full h-full bg-secondary hover:bg-orange-600 text-white font-bold text-lg rounded-xl shadow-[0_8px_20px_-6px_rgba(234,88,12,0.5)] transition transform hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center min-h-[72px]"
+                                className="w-full h-full bg-secondary hover:bg-orange-600 text-white font-bold text-lg rounded-xl shadow-lg shadow-orange-500/30 transition transform hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center min-h-[72px]"
                             >
                                 <Search className="w-6 h-6 mr-2" />
-                                Find Stay
+                                Search
                             </button>
                         </div>
                     </div>
+                    )}
                 </motion.div>
             )}
             </div>
@@ -294,80 +379,56 @@ const HomePage: React.FC<HomePageProps> = ({ onSearch, onHotelSearch }) => {
           </div>
       </div>
 
-      {/* AI Recommendations Section */}
-      {activeTab === 'flights' && (
-      <div className="bg-slate-50 py-20 mt-12">
+      {/* Blog */}
+      {features.blogEnabled && (
+      <div className="bg-slate-50 py-24">
           <div className="max-w-7xl mx-auto px-4">
-            <div className="flex flex-col md:flex-row items-center justify-between mb-12">
-                <div>
-                    <h2 className="text-3xl font-bold text-slate-900 flex items-center">
-                        <Sparkles className="w-8 h-8 text-secondary mr-3" /> AI Trip Intelligence
+              <div className="flex flex-col md:flex-row md:justify-between md:items-end mb-12">
+                  <div className="max-w-2xl">
+                    <h2 className="text-3xl md:text-4xl font-bold text-slate-900 font-serif mb-4 flex items-center">
+                         Blog
                     </h2>
-                    <p className="text-slate-500 mt-2 text-lg">Smart insights for your selected destination, powered by Gemini.</p>
-                </div>
-            </div>
+                    <p className="text-lg text-slate-500">Read our latest blog entries, guides, and inspiration for your next big adventure.</p>
+                  </div>
+                  <Link to="/blog" className="flex text-primary font-bold items-center hover:text-blue-800 transition-colors mt-4 md:mt-0">
+                      View all stories <ArrowRight className="w-5 h-5 ml-2" />
+                  </Link>
+              </div>
 
-            {loadingAi ? (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {[1, 2, 3].map(i => (
-                         <div key={i} className="animate-pulse bg-white p-6 rounded-2xl shadow-sm border border-slate-100 h-64">
-                             <div className="h-6 bg-slate-200 rounded w-2/3 mb-4"></div>
-                             <div className="h-4 bg-slate-200 rounded w-full mb-2"></div>
-                             <div className="h-4 bg-slate-200 rounded w-5/6 mb-6"></div>
-                             <div className="h-8 bg-blue-50 rounded w-1/3"></div>
-                         </div>
-                    ))}
-                </div>
-            ) : aiRec ? (
-                <motion.div 
-                    initial={{ opacity: 0, scale: 0.98 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="bg-white rounded-2xl shadow-xl shadow-indigo-100/50 border border-indigo-50 p-8 md:p-12 flex flex-col lg:flex-row gap-12 relative overflow-hidden"
-                >
-                    <div className="absolute top-0 right-0 p-16 -mr-8 -mt-8 bg-gradient-to-bl from-indigo-50 to-transparent rounded-full opacity-50"></div>
-                    
-                    <div className="flex-1 relative z-10">
-                        <span className="inline-block px-4 py-1.5 bg-indigo-50 text-indigo-600 font-bold text-sm rounded-full mb-6">Destination Spotlight</span>
-                        <h3 className="text-4xl font-extrabold text-slate-900 mb-6 font-serif">Why visit {aiRec.destination}?</h3>
-                        <p className="text-slate-600 leading-relaxed text-lg mb-8">{aiRec.description}</p>
-                        
-                        <div className="bg-orange-50 border border-secondary/20 p-5 rounded-xl flex items-start group hover:bg-orange-100 transition-colors cursor-pointer">
-                            <span className="text-3xl mr-4 group-hover:scale-110 transition-transform">🍜</span>
-                            <div>
-                                <h4 className="font-bold text-orange-900 flex items-center text-sm uppercase tracking-wider mb-1">Must Try Local Food</h4>
-                                <p className="text-orange-800 font-medium">{aiRec.food}</p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div className="flex-1 lg:pl-12 lg:border-l border-slate-100 relative z-10">
-                        <h4 className="text-xl font-bold text-slate-900 mb-6 flex items-center">
-                            <Map className="w-5 h-5 mr-2 text-primary" /> Top Attractions
-                        </h4>
-                        <div className="grid gap-4">
-                            {(aiRec.attractions || []).map((attr: string, idx: number) => (
-                                <div key={idx} className="flex items-center p-4 rounded-xl border border-slate-100 hover:border-primary/30 hover:shadow-md transition-all bg-white group cursor-pointer">
-                                    <div className="w-10 h-10 rounded-full bg-blue-50 text-primary flex items-center justify-center font-bold mr-4 group-hover:bg-primary group-hover:text-white transition-colors">
-                                        {idx + 1}
-                                    </div>
-                                    <span className="font-semibold text-slate-700 group-hover:text-slate-900">{attr}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </motion.div>
-            ) : (
-                <div className="bg-white p-12 rounded-2xl shadow-sm border border-slate-100 text-center">
-                    <Globe2 className="w-16 h-16 text-slate-200 mx-auto mb-4" />
-                    <h3 className="text-xl font-bold text-slate-400 mb-2">Select a destination above</h3>
-                    <p className="text-slate-500">Our AI will generate custom insights, food recommendations and attractions for your trip.</p>
-                </div>
-            )}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                  {blogs.map((post, idx) => (
+                      <motion.article 
+                         key={post.id || idx} 
+                         onClick={() => { window.scrollTo(0, 0); navigate(`/blogs/post/${post.id}`); }}
+                         initial={{opacity:0, y:20}} 
+                         whileInView={{opacity:1, y:0}}
+                         viewport={{once: true}}
+                         transition={{delay: idx * 0.1}} 
+                         className="bg-white rounded-3xl overflow-hidden shadow-sm hover:shadow-xl transition border border-slate-100 flex flex-col group cursor-pointer"
+                       >
+                          <div className="h-48 md:h-56 w-full bg-slate-200 relative overflow-hidden">
+                              {post.imageUrl ? (
+                                  <img src={post.imageUrl} alt={post.title} className="w-full h-full object-cover group-hover:scale-105 transition duration-700" />
+                              ) : (
+                                  <div className="w-full h-full bg-slate-800 flex items-center justify-center text-white/50 font-serif text-2xl px-6 text-center">{post.title}</div>
+                              )}
+                          </div>
+                          <div className="p-6 flex-1 flex flex-col bg-white relative z-10 -mt-6 rounded-t-3xl border-t border-white/50">
+                              <h3 className="text-xl font-bold text-slate-900 group-hover:text-primary transition font-serif mb-3 line-clamp-2">{post.title}</h3>
+                              <p className="text-slate-600 line-clamp-3 mb-4 flex-1 text-sm leading-relaxed">{post.excerpt}</p>
+                              <div className="mt-auto flex items-center text-primary font-bold text-sm tracking-wide">
+                                  Read Article <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-2 transition" />
+                              </div>
+                          </div>
+                      </motion.article>
+                  ))}
+              </div>
           </div>
       </div>
       )}
 
       {/* Popular Destinations Grid */}
+      {features.destinationsEnabled && (
       <div className="py-24 bg-white">
           <div className="max-w-7xl mx-auto px-4">
               <div className="flex flex-col md:flex-row md:justify-between md:items-end mb-12">
@@ -401,6 +462,7 @@ const HomePage: React.FC<HomePageProps> = ({ onSearch, onHotelSearch }) => {
               </div>
           </div>
       </div>
+      )}
 
       {/* Why Choose Us Features */}
       <div className="bg-slate-900 py-24 text-white">

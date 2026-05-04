@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { getPressReleases } from '../services/firebaseService';
-import { Loader2, ExternalLink, Newspaper, Calendar } from 'lucide-react';
+import { Loader2, ExternalLink, Newspaper, Calendar, ArrowRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const PressMediaPage: React.FC = () => {
     const [releases, setReleases] = useState<any[]>([]);
@@ -38,30 +39,30 @@ const PressMediaPage: React.FC = () => {
                    </div>
                ) : (
                    <div className="grid grid-cols-1 gap-6">
-                       {releases.map((item, idx) => (
-                           <motion.a 
-                              key={item.id} 
-                              href={item.link}
-                              target="_blank"
-                              rel="noreferrer"
-                              initial={{opacity:0, y:20}} 
-                              animate={{opacity:1, y:0}} 
-                              transition={{delay: idx * 0.1}} 
-                              className="bg-white p-6 md:p-8 rounded-3xl shadow-sm hover:shadow-md transition border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-6 group"
-                            >
-                               <div>
-                                   <div className="flex items-center text-sm font-bold text-slate-500 mb-3">
-                                       <span className="bg-blue-50 text-primary px-3 py-1 rounded-full">{item.publisher}</span>
-                                       <span className="mx-3 opacity-30">•</span>
-                                       <Calendar className="w-4 h-4 mr-1.5" /> {item.date}
+                        {releases.map((item, idx) => (
+                            <motion.div 
+                               key={item.id} 
+                               initial={{opacity:0, y:20}} 
+                               animate={{opacity:1, y:0}} 
+                               transition={{delay: idx * 0.1}} 
+                             >
+                                <Link 
+                                   to={`/press/post/${item.id}`} 
+                                   onClick={() => window.scrollTo(0,0)} 
+                                   className="bg-white p-6 md:p-8 rounded-3xl shadow-sm hover:shadow-md transition border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-6 group block w-full text-left"
+                                 >
+                                   <div>
+                                       <div className="flex items-center text-sm font-bold text-slate-500 mb-3">
+                                           <span className="bg-blue-50 text-primary px-3 py-1 rounded-full">{item.publisher || item.source || 'HQ Travels'}</span>
+                                           <span className="mx-3 opacity-30">•</span>
+                                           <Calendar className="w-4 h-4 mr-1.5" /> {item.date || item.publishedAt}
+                                       </div>
+                                       <h3 className="text-xl md:text-2xl font-bold text-slate-900 group-hover:text-primary transition mb-3">{item.title}</h3>
+                                       <p className="text-sm font-bold text-primary flex items-center group-hover:underline">Read Release <ArrowRight className="w-4 h-4 ml-1" /></p>
                                    </div>
-                                   <h3 className="text-xl md:text-2xl font-bold text-slate-900 group-hover:text-primary transition">{item.title}</h3>
-                               </div>
-                               <div className="shrink-0 w-12 h-12 rounded-full border border-slate-200 flex items-center justify-center text-slate-400 group-hover:bg-primary group-hover:text-white group-hover:border-primary transition">
-                                   <ExternalLink className="w-5 h-5 pointer-events-none" />
-                               </div>
-                           </motion.a>
-                       ))}
+                                </Link>
+                            </motion.div>
+                        ))}
                    </div>
                )}
             </div>

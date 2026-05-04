@@ -56,15 +56,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signInWithEmail = async (email: string, pass: string) => {
-    try {
-        await signInWithEmailAndPassword(auth, email, pass);
-    } catch (error: any) {
-        if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
-            await createUserWithEmailAndPassword(auth, email, pass);
-        } else {
-            throw error;
-        }
-    }
+    await signInWithEmailAndPassword(auth, email, pass);
   };
 
   const logout = () => signOut(auth);

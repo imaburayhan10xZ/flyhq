@@ -1,6 +1,6 @@
 import { AIRecommendation, AILiveInsight, GroundingSource } from "../types";
 
-const OPENROUTER_API_KEY = "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";
+const OPENROUTER_API_KEY = (import.meta as any).env?.VITE_OPENROUTER_API_KEY || "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";
 
 async function fetchFromOpenRouter(model: string, prompt: string) {
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {

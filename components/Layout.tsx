@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { Plane, User, Phone, ShieldCheck, MapPin, Mail, Navigation, Facebook, Instagram, Twitter, Linkedin, Send, Youtube, MessageCircle, Video } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Link, useLocation } from 'react-router-dom';
 import { getSupportChannels } from '../services/firebaseService';
+import { FeaturesContext } from '../context/FeaturesContext';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -15,6 +16,7 @@ const Layout: React.FC<LayoutProps> = ({ children, customLogo }) => {
   const [supportData, setSupportData] = useState<any>(null);
   const location = useLocation();
   const currentPage = location.pathname === '/' ? 'home' : location.pathname.substring(1);
+  const features = useContext(FeaturesContext);
 
   // Use customLogo if available, otherwise try local file, then fallback
   const logoSource = customLogo || "/logo.png";
@@ -70,7 +72,20 @@ const Layout: React.FC<LayoutProps> = ({ children, customLogo }) => {
             </Link>
             
             <nav className="hidden lg:flex items-center space-x-1">
-              {['home', 'hotels', 'holidays', 'visa'].map((item) => {
+              {[
+                  { id: 'home', show: features.topNavHomeEnabled !== false }, 
+                  { id: 'hotels', show: features.topNavHotelsEnabled !== false && features.hotelsEnabled !== false }, 
+                  { id: 'holidays', show: features.topNavHolidaysEnabled !== false && features.holidaysEnabled !== false }, 
+                  { id: 'visa', show: features.topNavVisaEnabled !== false && features.visaEnabled !== false },
+                  { id: 'about', show: features.topNavAboutEnabled === true },
+                  { id: 'careers', show: features.topNavCareersEnabled === true && features.careersEnabled !== false },
+                  { id: 'press', show: features.topNavPressEnabled === true && features.pressEnabled !== false },
+                  { id: 'blog', show: features.topNavBlogEnabled === true && features.blogEnabled !== false },
+                  { id: 'help', show: features.topNavHelpEnabled === true },
+                  { id: 'privacy', show: features.topNavPrivacyEnabled === true },
+                  { id: 'terms', show: features.topNavTermsEnabled === true },
+                  { id: 'refund', show: features.topNavRefundEnabled === true },
+              ].filter(item => item.show).map(({ id: item }) => {
                   const targetPath = item === 'home' ? '/' : `/${item}`;
                   const isActive = currentPage === item || (item === 'home' && currentPage === '');
                   return (
@@ -188,10 +203,10 @@ const Layout: React.FC<LayoutProps> = ({ children, customLogo }) => {
             <div className="md:col-span-2 md:col-start-6">
               <h3 className="font-bold text-lg mb-6 text-white tracking-wide">Company</h3>
               <ul className="space-y-4 text-slate-400 font-medium">
-                <li><Link to="/about" onClick={() => window.scrollTo(0,0)} className="hover:text-secondary hover:translate-x-1 transition-transform inline-block">About Us</Link></li>
-                <li><Link to="/careers" onClick={() => window.scrollTo(0,0)} className="hover:text-secondary hover:translate-x-1 transition-transform inline-block">Careers</Link></li>
-                <li><Link to="/press" onClick={() => window.scrollTo(0,0)} className="hover:text-secondary hover:translate-x-1 transition-transform inline-block">Press & Media</Link></li>
-                <li><Link to="/blog" onClick={() => window.scrollTo(0,0)} className="hover:text-secondary hover:translate-x-1 transition-transform inline-block">Travel Blog</Link></li>
+                {features.navAboutEnabled !== false && <li><Link to="/about" onClick={() => window.scrollTo(0,0)} className="hover:text-secondary hover:translate-x-1 transition-transform inline-block">About Us</Link></li>}
+                {features.navCareersEnabled !== false && features.careersEnabled !== false && <li><Link to="/careers" onClick={() => window.scrollTo(0,0)} className="hover:text-secondary hover:translate-x-1 transition-transform inline-block">Careers</Link></li>}
+                {features.navPressEnabled !== false && features.pressEnabled !== false && <li><Link to="/press" onClick={() => window.scrollTo(0,0)} className="hover:text-secondary hover:translate-x-1 transition-transform inline-block">Press & Media</Link></li>}
+                {features.navBlogEnabled !== false && features.blogEnabled !== false && <li><Link to="/blog" onClick={() => window.scrollTo(0,0)} className="hover:text-secondary hover:translate-x-1 transition-transform inline-block">Travel Blog</Link></li>}
               </ul>
             </div>
 
@@ -199,10 +214,10 @@ const Layout: React.FC<LayoutProps> = ({ children, customLogo }) => {
             <div className="md:col-span-2">
               <h3 className="font-bold text-lg mb-6 text-white tracking-wide">Support</h3>
               <ul className="space-y-4 text-slate-400 font-medium">
-                <li><Link to="/help" onClick={() => window.scrollTo(0,0)} className="hover:text-secondary hover:translate-x-1 transition-transform inline-block">Help Center</Link></li>
-                <li><Link to="/privacy" onClick={() => window.scrollTo(0,0)} className="hover:text-secondary hover:translate-x-1 transition-transform inline-block">Privacy Policy</Link></li>
-                <li><Link to="/terms" onClick={() => window.scrollTo(0,0)} className="hover:text-secondary hover:translate-x-1 transition-transform inline-block">Terms of Service</Link></li>
-                <li><Link to="/refund" onClick={() => window.scrollTo(0,0)} className="hover:text-secondary hover:translate-x-1 transition-transform inline-block">Refund Rules</Link></li>
+                {features.navHelpEnabled !== false && <li><Link to="/help" onClick={() => window.scrollTo(0,0)} className="hover:text-secondary hover:translate-x-1 transition-transform inline-block">Help Center</Link></li>}
+                {features.navPrivacyEnabled !== false && <li><Link to="/privacy" onClick={() => window.scrollTo(0,0)} className="hover:text-secondary hover:translate-x-1 transition-transform inline-block">Privacy Policy</Link></li>}
+                {features.navTermsEnabled !== false && <li><Link to="/terms" onClick={() => window.scrollTo(0,0)} className="hover:text-secondary hover:translate-x-1 transition-transform inline-block">Terms of Service</Link></li>}
+                {features.navRefundEnabled !== false && <li><Link to="/refund" onClick={() => window.scrollTo(0,0)} className="hover:text-secondary hover:translate-x-1 transition-transform inline-block">Refund Rules</Link></li>}
               </ul>
             </div>
 

@@ -14,8 +14,12 @@ import GenericPage from './pages/GenericPage';
 import CareersPage from './pages/CareersPage';
 import PressMediaPage from './pages/PressMediaPage';
 import TravelBlogPage from './pages/TravelBlogPage';
+import BlogPostPage from './pages/BlogPostPage';
+import PressPostPage from './pages/PressPostPage';
 import DestinationsPage from './pages/DestinationsPage';
 import { SearchParams, Flight, HotelSearchParams } from './types';
+import { FeaturesContext } from './context/FeaturesContext';
+import { getFeaturesConfig } from './services/firebaseService';
 
 const ScrollToTop = () => {
   const { pathname } = useLocation();
@@ -32,7 +36,42 @@ const App: React.FC = () => {
   const [selectedFlight, setSelectedFlight] = useState<Flight | null>(null);
   const [confirmedBookingId, setConfirmedBookingId] = useState<string>('');
   
-  // Logo State management
+  // Features Config State
+  const [features, setFeatures] = useState<any>({
+      topNavHomeEnabled: true,
+      topNavHotelsEnabled: true,
+      topNavHolidaysEnabled: true,
+      topNavVisaEnabled: true,
+      topNavAboutEnabled: false,
+      topNavCareersEnabled: false,
+      topNavPressEnabled: false,
+      topNavBlogEnabled: false,
+      topNavHelpEnabled: false,
+      topNavPrivacyEnabled: false,
+      topNavTermsEnabled: false,
+      topNavRefundEnabled: false,
+      navHomeEnabled: true,
+      navHotelsEnabled: true,
+      navHolidaysEnabled: true,
+      navVisaEnabled: true,
+      navAboutEnabled: true,
+      navCareersEnabled: true,
+      navPressEnabled: true,
+      navBlogEnabled: true,
+      navHelpEnabled: true,
+      navPrivacyEnabled: true,
+      navTermsEnabled: true,
+      navRefundEnabled: true,
+      flightsEnabled: true,
+      hotelsEnabled: true,
+      holidaysEnabled: true,
+      visaEnabled: true,
+      destinationsEnabled: true,
+      blogEnabled: true,
+      careersEnabled: true,
+      pressEnabled: true
+  });
+  
   const [logoUrl, setLogoUrl] = useState<string>('');
 
   useEffect(() => {
@@ -40,6 +79,9 @@ const App: React.FC = () => {
     if (savedLogo) {
       setLogoUrl(savedLogo);
     }
+    getFeaturesConfig().then(data => {
+        if (data) setFeatures(data);
+    }).catch(err => console.error(err));
   }, []);
 
   const handleLogoUpdate = (newUrl: string) => {
@@ -68,7 +110,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <>
+    <FeaturesContext.Provider value={features}>
       <ScrollToTop />
       <Routes>
         {/* Admin Route - No Layout */}
@@ -78,9 +120,13 @@ const App: React.FC = () => {
         <Route path="*" element={
           <Layout customLogo={logoUrl}>
             <Routes>
-              <Route path="/" element={<HomePage onSearch={handleSearch} onHotelSearch={handleHotelSearch} />} />
+              {features.flightsEnabled || features.hotelsEnabled ? (
+                  <Route path="/" element={<HomePage onSearch={handleSearch} onHotelSearch={handleHotelSearch} />} />
+              ) : (
+                  <Route path="/" element={<HomePage onSearch={handleSearch} onHotelSearch={handleHotelSearch} />} />
+              )}
               <Route path="/search" element={
-                searchParams ? (
+                searchParams && features.flightsEnabled ? (
                   <SearchResultsPage 
                     params={searchParams} 
                     onSelectFlight={handleSelectFlight}
@@ -89,7 +135,7 @@ const App: React.FC = () => {
                 ) : <HomePage onSearch={handleSearch} onHotelSearch={handleHotelSearch} />
               } />
               <Route path="/hotel-search" element={
-                hotelParams ? (
+                hotelParams && features.hotelsEnabled ? (
                   <HotelResultsPage 
                       params={hotelParams}
                       onBack={() => navigate('/')}
@@ -97,7 +143,7 @@ const App: React.FC = () => {
                 ) : <HomePage onSearch={handleSearch} onHotelSearch={handleHotelSearch} />
               } />
               <Route path="/booking" element={
-                selectedFlight ? (
+                selectedFlight && features.flightsEnabled ? (
                   <BookingPage 
                     flight={selectedFlight} 
                     onSuccess={handleBookingSuccess}
@@ -110,23 +156,25 @@ const App: React.FC = () => {
                   <ConfirmationPage bookingId={confirmedBookingId} onHome={() => navigate('/')} />
                 ) : <HomePage onSearch={handleSearch} onHotelSearch={handleHotelSearch} />
               } />
-              <Route path="/destinations" element={<DestinationsPage />} />
-              <Route path="/hotels" element={<HotelsPage />} />
-              <Route path="/holidays" element={<HolidaysPage />} />
-              <Route path="/visa" element={<VisaPage />} />
+              {features.destinationsEnabled && <Route path="/destinations" element={<DestinationsPage />} />}
+              {features.hotelsEnabled && <Route path="/hotels" element={<HotelsPage />} />}
+              {features.holidaysEnabled && <Route path="/holidays" element={<HolidaysPage />} />}
+              {features.visaEnabled && <Route path="/visa" element={<VisaPage />} />}
               <Route path="/about" element={<GenericPage pageId="about" defaultTitle="About Us" />} />
               <Route path="/help" element={<GenericPage pageId="help" defaultTitle="Help Center" />} />
               <Route path="/privacy" element={<GenericPage pageId="privacy" defaultTitle="Privacy Policy" />} />
               <Route path="/terms" element={<GenericPage pageId="terms" defaultTitle="Terms of Service" />} />
               <Route path="/refund" element={<GenericPage pageId="refund" defaultTitle="Refund Rules" />} />
-              <Route path="/careers" element={<CareersPage />} />
-              <Route path="/press" element={<PressMediaPage />} />
-              <Route path="/blog" element={<TravelBlogPage />} />
+              {features.careersEnabled && <Route path="/careers" element={<CareersPage />} />}
+              {features.pressEnabled && <Route path="/press" element={<PressMediaPage />} />}
+              {features.pressEnabled && <Route path="/press/post/:id" element={<PressPostPage />} />}
+              {features.blogEnabled && <Route path="/blog" element={<TravelBlogPage />} />}
+              {features.blogEnabled && <Route path="/blogs/post/:id" element={<BlogPostPage />} />}
             </Routes>
           </Layout>
         } />
       </Routes>
-    </>
+    </FeaturesContext.Provider>
   );
 };
 

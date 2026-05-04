@@ -6,7 +6,8 @@ export enum FlightClass {
 
 export enum TripType {
   ONE_WAY = 'One Way',
-  ROUND_TRIP = 'Round Trip'
+  ROUND_TRIP = 'Round Trip',
+  MULTI_CITY = 'Multi-City'
 }
 
 export interface Airport {

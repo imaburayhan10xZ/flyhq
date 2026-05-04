@@ -15,7 +15,7 @@ const GenericPage: React.FC<GenericPageProps> = ({ pageId, defaultTitle }) => {
 
     useEffect(() => {
         setLoading(true);
-        getPageData(pageId).then(d => {
+        getPageData(pageId).then((d: any) => {
             if (d && d.content) {
                 setData(d);
             } else {

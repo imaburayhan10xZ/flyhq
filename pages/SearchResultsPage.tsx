@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { SearchParams, Flight, AILiveInsight } from '../types';
 import { searchFlights } from '../services/mockApi';
 import { getRealtimeFlightInsights } from '../services/geminiService';
-import { Clock, Briefcase, Filter, ArrowRight, Sparkles, Globe, Loader2 } from 'lucide-react';
+import { Clock, Briefcase, Filter, ArrowRight, Sparkles, Globe, Loader2, Plane } from 'lucide-react';
 
 interface SearchResultsPageProps {
   params: SearchParams;
@@ -184,7 +184,9 @@ const SearchResultsPage: React.FC<SearchResultsPageProps> = ({ params, onSelectF
                     filteredFlights.map(flight => (
                         <div key={flight.id} className="bg-white rounded-lg shadow-sm hover:shadow-md transition p-5 border border-gray-100 flex flex-col md:flex-row items-center justify-between group">
                             <div className="flex items-center mb-4 md:mb-0 w-full md:w-1/4">
-                                <img src={flight.airlineLogo} alt={flight.airline} className="w-10 h-10 rounded-full mr-4 bg-gray-50 object-cover" />
+                                <div className="w-10 h-10 rounded-full mr-4 bg-blue-50 text-primary flex items-center justify-center border border-blue-100">
+                                    <Plane className="w-5 h-5" />
+                                </div>
                                 <div>
                                     <div className="font-bold text-gray-900">{flight.airline}</div>
                                     <div className="text-xs text-gray-500">{flight.flightNumber} • {flight.class}</div>
