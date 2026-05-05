@@ -217,11 +217,10 @@ const HomePage: React.FC<HomePageProps> = ({ onSearch, onHotelSearch }) => {
   const [airportsList, setAirportsList] = useState<any[]>([]);
 
   useEffect(() => {
-    // Fetch real airports list
-    fetch('/airports.json')
-      .then(res => res.json())
-      .then(data => setAirportsList(data))
-      .catch(err => console.error("Could not fetch airports list", err));
+    // Use dynamic import instead of fetch
+    import('../public/airports.json')
+      .then(module => setAirportsList(module.default))
+      .catch(err => console.error("Could not load airports list", err));
 
     getDestinations().then(data => {
       if (data) {

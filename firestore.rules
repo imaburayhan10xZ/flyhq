@@ -116,7 +116,7 @@ service cloud.firestore {
     match /consultations/{consultationId} {
        function isValidConsultation(data) {
            return data.keys().hasAll(['type', 'itemId', 'itemName', 'name', 'phone', 'email', 'status'])
-               && data.type is string && (data.type == 'visa' || data.type == 'holiday' || data.type == 'hotel' || data.type == 'flight' || data.type == 'destination')
+               && data.type is string && (data.type == 'visa' || data.type == 'holiday' || data.type == 'hotel' || data.type == 'flight' || data.type == 'destination' || data.type == 'Job Application')
                && data.itemId is string && data.itemId.size() <= 128
                && data.itemName is string && data.itemName.size() <= 128
                && data.name is string && data.name.size() <= 100

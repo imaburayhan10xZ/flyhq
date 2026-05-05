@@ -7,11 +7,16 @@ import {
   LayoutDashboard, Ticket, DollarSign, Users, Upload, Image as ImageIcon, 
   Loader2, CheckCircle, Search, Menu, Settings, Plane, BedDouble, 
   Plus, Edit2, Trash2, Bell, ChevronRight, MoreVertical, X, LogIn, ShieldCheck,
-  Palmtree, FileText, Phone, LogOut, CreditCard, ToggleLeft, ToggleRight, Mail
+  Palmtree, FileText, Phone, LogOut, CreditCard, ToggleLeft, ToggleRight, Mail, Rocket
 } from 'lucide-react';
 import { uploadImage } from '../services/cloudinaryService';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../components/AuthProvider';
+import { updateProfile, updatePassword } from 'firebase/auth';
+import { auth } from '../firebase';
+import toast, { Toaster } from 'react-hot-toast';
+import { ConfirmDialog } from '../components/ConfirmDialog';
+import { UserCircle } from 'lucide-react';
 import { getHotelOffers, saveHotelOffer, deleteHotelOffer, getHolidayPackages, saveHolidayPackage, deleteHolidayPackage, getVisaServices, saveVisaService, deleteVisaService, getPageData, savePageData, getJobs, saveJob, deleteJob, getPressReleases, savePressRelease, deletePressRelease, getBlogPosts, saveBlogPost, deleteBlogPost, getSupportChannels, saveSupportChannels, getDestinations, saveDestination, deleteDestination, getAdminFlights, saveAdminFlight, deleteAdminFlight, getUsers, updateUserRole, getPaymentMethodsConfig, savePaymentMethodsConfig, getFeaturesConfig, saveFeaturesConfig, getConsultations, updateConsultationStatus, updateConsultationNotes } from '../services/firebaseService';
 
 interface AdminDashboardProps {
@@ -19,7 +24,7 @@ interface AdminDashboardProps {
     currentLogo?: string;
 }
 
-type TabType = 'overview' | 'bookings' | 'flights' | 'destinations' | 'hotels' | 'holidays' | 'visa' | 'pages' | 'careers' | 'press' | 'blog' | 'users' | 'settings' | 'support_channels' | 'payment_methods';
+type TabType = 'overview' | 'bookings' | 'flights' | 'destinations' | 'hotels' | 'holidays' | 'visa' | 'pages' | 'careers' | 'press' | 'blog' | 'users' | 'settings' | 'support_channels' | 'payment_methods' | 'profile';
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLogo }) => {
   const { user, isAdmin, loading, signInWithGoogle, signInWithEmail, logout } = useAuth();
@@ -65,6 +70,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
   const [consultations, setConsultations] = useState<any[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<any>({ card: true, bkash: true });
   const [featuresConfig, setFeaturesConfig] = useState<any>({ 
+      brandName: 'HQ TRAVELS', showBrandName: true,
       flightsEnabled: true, hotelsEnabled: true, 
       topNavHomeEnabled: true, topNavHotelsEnabled: true, topNavHolidaysEnabled: true, topNavVisaEnabled: true,
       navHomeEnabled: true, navHotelsEnabled: true, navHolidaysEnabled: true, navVisaEnabled: true });
@@ -72,6 +78,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
   const [aboutUsData, setAboutUsData] = useState<any>({title: '', content: '', imageUrl: ''});
   const [supportData, setSupportData] = useState<any>({ address: '', phone: '', email: '', socials: [] });
   const [isSidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 1024);
+  const [confirmOptions, setConfirmOptions] = useState<{isOpen: boolean, title: string, message: string, onConfirm: () => void} | null>(null);
+
+  const confirmAction = (title: string, message: string, onConfirm: () => void) => {
+      setConfirmOptions({ isOpen: true, title, message, onConfirm: () => {
+          onConfirm();
+          setConfirmOptions(null);
+      }});
+  };
   
   useEffect(() => {
      const handleResize = () => {
@@ -95,6 +109,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
   const [formData, setFormData] = useState<any>({});
   
   const [isConsultationModalOpen, setConsultationModalOpen] = useState(false);
+  const [isNotificationsOpen, setNotificationsOpen] = useState(false);
   const [selectedConsultation, setSelectedConsultation] = useState<any>(null);
   const [consultationNotes, setConsultationNotes] = useState('');
 
@@ -134,13 +149,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
           setFormData({...formData, imageUrl: url, image: url});
       } catch (err) {
           console.error('Failed to upload image', err);
-          alert('Failed to upload image.');
+          toast.error('Failed to upload image.');
       } finally {
           setUploading(false);
       }
   };
 
   const handleCreateSubmit = async () => {
+        const toastId = toast.loading('Saving...');
     try {
         const id = formData.id || Date.now().toString();
         const isEdit = !!formData.id;
@@ -234,7 +250,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
             return;
         }
         setModalOpen(false);
+            toast.success('Saved successfully', { id: toastId });
     } catch(err) {
+            toast.error('Failed to save', { id: toastId });
         console.error(err);
     }
   };
@@ -331,39 +349,69 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
     );
   }
 
-  const handleDeleteHotel = async (id: string) => {
-      if(window.confirm('Are you sure you want to delete this hotel?')) {
-          await deleteHotelOffer(id);
-          setHotels(hotels.filter(h => h.id !== id));
-      }
+  const handleDeleteHotel = (id: string) => {
+      confirmAction('Delete Hotel', 'Are you sure you want to delete this hotel?', async () => {
+          const toastId = toast.loading('Deleting...');
+          try {
+             await deleteHotelOffer(id);
+             setHotels(hotels.filter(h => h.id !== id));
+             toast.success('Hotel deleted', { id: toastId });
+          } catch(e) {
+             toast.error('Failed to delete', { id: toastId });
+          }
+      });
   }
   
-  const handleDeleteHoliday = async (id: string) => {
-      if(window.confirm('Are you sure you want to delete this holiday?')) {
-          await deleteHolidayPackage(id);
-          setHolidays(holidays.filter(h => h.id !== id));
-      }
+  const handleDeleteHoliday = (id: string) => {
+      confirmAction('Delete Holiday', 'Are you sure you want to delete this holiday?', async () => {
+          const toastId = toast.loading('Deleting...');
+          try {
+             await deleteHolidayPackage(id);
+             setHolidays(holidays.filter(h => h.id !== id));
+             toast.success('Holiday deleted', { id: toastId });
+          } catch(e) {
+             toast.error('Failed to delete', { id: toastId });
+          }
+      });
   }
 
-  const handleDeleteVisa = async (id: string) => {
-      if(window.confirm('Are you sure you want to delete this visa service?')) {
-          await deleteVisaService(id);
-          setVisas(visas.filter(v => v.id !== id));
-      }
+  const handleDeleteVisa = (id: string) => {
+      confirmAction('Delete Visa Service', 'Are you sure you want to delete this visa service?', async () => {
+          const toastId = toast.loading('Deleting...');
+          try {
+             await deleteVisaService(id);
+             setVisas(visas.filter(v => v.id !== id));
+             toast.success('Visa service deleted', { id: toastId });
+          } catch(e) {
+             toast.error('Failed to delete', { id: toastId });
+          }
+      });
   }
 
-  const handleDeleteDestination = async (id: string) => {
-      if(window.confirm('Are you sure you want to delete this destination?')) {
-          await deleteDestination(id);
-          setDestinations(destinations.filter(d => d.id !== id));
-      }
+  const handleDeleteDestination = (id: string) => {
+      confirmAction('Delete Destination', 'Are you sure you want to delete this destination?', async () => {
+          const toastId = toast.loading('Deleting...');
+          try {
+             await deleteDestination(id);
+             setDestinations(destinations.filter(d => d.id !== id));
+             toast.success('Destination deleted', { id: toastId });
+          } catch(e) {
+             toast.error('Failed to delete', { id: toastId });
+          }
+      });
   }
 
-  const handleDeleteFlight = async (id: string) => {
-      if(window.confirm('Are you sure you want to delete this flight?')) {
-          await deleteAdminFlight(id);
-          setAdminFlights(adminFlights.filter(f => f.id !== id));
-      }
+  const handleDeleteFlight = (id: string) => {
+      confirmAction('Delete Flight', 'Are you sure you want to delete this flight?', async () => {
+          const toastId = toast.loading('Deleting...');
+          try {
+             await deleteAdminFlight(id);
+             setAdminFlights(adminFlights.filter(f => f.id !== id));
+             toast.success('Flight deleted', { id: toastId });
+          } catch(e) {
+             toast.error('Failed to delete', { id: toastId });
+          }
+      });
   }
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -380,7 +428,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
           setUploadSuccess(true);
           setTimeout(() => setUploadSuccess(false), 3000);
       } catch (err) {
-          alert("Failed to upload image. Please try again.");
+          toast.error('Failed to upload image. Please try again.');
       } finally {
           setUploading(false);
       }
@@ -403,6 +451,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
       { id: 'FL-412', route: 'DAC - SIN', airline: 'Singapore Air', price: '$350', status: 'Active', capacity: '78%' },
   ];
 
+  const pendingConsultationsCount = consultations.filter(c => !c.status || c.status === 'pending').length;
+  const pendingBookingsCount = bookings.filter(b => b.status === 'PENDING').length;
+  const totalNotifications = pendingConsultationsCount + pendingBookingsCount;
+
   const TABS = [
       { id: 'overview', label: 'Dashboard', icon: LayoutDashboard },
       { id: 'bookings', label: 'Consultations & Bookings', icon: Ticket },
@@ -417,6 +469,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
       { id: 'blog', label: 'Travel Blog', icon: FileText },
       { id: 'support_channels', label: 'Support Channels', icon: Phone },
       { id: 'users', label: 'User Management', icon: Users },
+      { id: 'profile', label: 'Admin Profile', icon: UserCircle },
       { id: 'payment_methods', label: 'Payment Methods', icon: CreditCard },
       { id: 'settings', label: 'Platform Settings', icon: Settings },
   ];
@@ -645,6 +698,32 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
                                         )}
                                     </div>
                                     <div className="flex-1">
+                                        <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-sm font-bold text-slate-700 mb-2">Brand Text</label>
+                                                <input 
+                                                    type="text" 
+                                                    value={featuresConfig.brandName || "HQ TRAVELS"}
+                                                    onChange={async (e) => {
+                                                        const newVal = e.target.value;
+                                                        setFeaturesConfig({...featuresConfig, brandName: newVal});
+                                                        await saveFeaturesConfig({...featuresConfig, brandName: newVal});
+                                                    }}
+                                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 font-medium focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                                                />
+                                            </div>
+                                            <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl p-3">
+                                                <span className="font-bold text-slate-800 text-sm">Show Brand Text in Header</span>
+                                                <button onClick={async () => {
+                                                    const newVal = featuresConfig.showBrandName === undefined ? false : !featuresConfig.showBrandName;
+                                                    setFeaturesConfig({...featuresConfig, showBrandName: newVal});
+                                                    await saveFeaturesConfig({...featuresConfig, showBrandName: newVal});
+                                                }}>
+                                                    {(featuresConfig.showBrandName === undefined ? true : featuresConfig.showBrandName) ? <ToggleRight className="w-8 h-8 text-primary" /> : <ToggleLeft className="w-8 h-8 text-slate-400" />}
+                                                </button>
+                                            </div>
+                                        </div>
+
                                         <label className="cursor-pointer bg-primary hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl inline-flex items-center transition shadow-lg shadow-blue-500/30 mb-4 min-w-[220px] justify-center">
                                             {uploading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Upload className="w-5 h-5 mr-2" />}
                                             {uploading ? "Uploading to Cloud..." : "Upload New Logo"}
@@ -882,7 +961,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
                                                     try {
                                                         await updateConsultationStatus(consultation.id, newStatus);
                                                     } catch (err) {
-                                                        alert("Failed to update status");
+                                                        toast.error('Failed to update status');
                                                     }
                                                 }}
                                                 className={`text-xs font-bold px-3 py-1.5 rounded-lg border-2 outline-none appearance-none cursor-pointer ${
@@ -1093,7 +1172,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
                                                     try {
                                                         await updateConsultationStatus(consultation.id, newStatus);
                                                     } catch (err) {
-                                                        alert("Failed to update status");
+                                                        toast.error('Failed to update status');
                                                     }
                                                 }}
                                                 className={`text-xs font-bold px-3 py-1.5 rounded-lg border-2 outline-none appearance-none cursor-pointer ${
@@ -1143,7 +1222,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
                                   <option value="refund">Refund Rules</option>
                               </select>
                               <button onClick={() => {
-                                  savePageData(selectedPageId, aboutUsData).then(() => alert('Saved!')).catch(e => alert(e.message));
+                                  toast.promise(savePageData(selectedPageId, aboutUsData), { loading: 'Saving...', success: 'Saved!', error: 'Failed to save' });
                               }} className="bg-primary hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold flex items-center transition shadow-lg shadow-blue-500/20 whitespace-nowrap">
                                   Save Changes
                               </button>
@@ -1187,10 +1266,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
                                     <div className="flex gap-2">
                                         <button onClick={() => openModal('career', j)} className="text-blue-500 font-bold text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition">Edit</button>
                                         <button onClick={async () => {
-                                            if(window.confirm('Delete?')) {
-                                                await deleteJob(j.id);
-                                                setJobs(jobs.filter(job => job.id !== j.id));
-                                            }
+                                            confirmAction('Delete Job', 'Are you sure you want to delete this job?', async () => {
+      const toastId = toast.loading('Deleting...');
+      try {
+          await deleteJob(j.id);
+          setJobs(jobs.filter(job => job.id !== j.id));
+          toast.success('Job deleted', { id: toastId });
+      } catch(e) { toast.error('Failed', { id: toastId }); }
+  });
                                         }} className="text-red-500 font-bold text-sm bg-red-50 px-4 py-2 rounded-lg hover:bg-red-100 transition">Delete</button>
                                     </div>
                                 </div>
@@ -1220,10 +1303,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
                                     <div className="flex gap-2">
                                         <button onClick={() => openModal('press', pr)} className="text-blue-500 font-bold text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition">Edit</button>
                                         <button onClick={async () => {
-                                            if(window.confirm('Delete?')) {
-                                                await deletePressRelease(pr.id);
-                                                setPressReleases(pressReleases.filter(p => p.id !== pr.id));
-                                            }
+                                            confirmAction('Delete Press Release', 'Are you sure you want to delete this press release?', async () => {
+      const toastId = toast.loading('Deleting...');
+      try {
+          await deletePressRelease(pr.id);
+          setPressReleases(pressReleases.filter(p => p.id !== pr.id));
+          toast.success('Press release deleted', { id: toastId });
+      } catch(e) { toast.error('Failed', { id: toastId }); }
+  });
                                         }} className="text-red-500 font-bold text-sm bg-red-50 px-4 py-2 rounded-lg hover:bg-red-100 transition">Delete</button>
                                     </div>
                                 </div>
@@ -1253,10 +1340,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
                                     <div className="flex gap-2">
                                         <button onClick={() => openModal('blog', bp)} className="text-blue-500 font-bold text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition">Edit</button>
                                         <button onClick={async () => {
-                                            if(window.confirm('Delete?')) {
-                                                await deleteBlogPost(bp.id);
-                                                setBlogPosts(blogPosts.filter(b => b.id !== bp.id));
-                                            }
+                                            confirmAction('Delete Blog Post', 'Are you sure you want to delete this blog post?', async () => {
+      const toastId = toast.loading('Deleting...');
+      try {
+          await deleteBlogPost(bp.id);
+          setBlogPosts(blogPosts.filter(b => b.id !== bp.id));
+          toast.success('Blog post deleted', { id: toastId });
+      } catch(e) { toast.error('Failed', { id: toastId }); }
+  });
                                         }} className="text-red-500 font-bold text-sm bg-red-50 px-4 py-2 rounded-lg hover:bg-red-100 transition">Delete</button>
                                     </div>
                                 </div>
@@ -1283,18 +1374,26 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
                                     <div className="flex gap-2">
                                         {u.role !== 'admin' && (
                                             <button onClick={async () => {
-                                                if(window.confirm(`Make ${u.email} an admin?`)) {
-                                                    await updateUserRole(u.id, 'admin');
-                                                    setUsersList(usersList.map(usr => usr.id === u.id ? {...usr, role: 'admin'} : usr));
-                                                }
+                                                confirmAction('Make Admin', `Make ${u.email} an admin?`, async () => {
+      const toastId = toast.loading('Updating...');
+      try {
+          await updateUserRole(u.id, 'admin');
+          setUsersList(usersList.map(usr => usr.id === u.id ? {...usr, role: 'admin'} : usr));
+          toast.success('User updated', { id: toastId });
+      } catch(e) { toast.error('Failed', { id: toastId }); }
+  });
                                             }} className="text-blue-600 font-bold text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100">Make Admin</button>
                                         )}
                                         {u.role === 'admin' && u.email !== user?.email && (
                                             <button onClick={async () => {
-                                                if(window.confirm(`Remove admin privileges for ${u.email}?`)) {
-                                                    await updateUserRole(u.id, 'user');
-                                                    setUsersList(usersList.map(usr => usr.id === u.id ? {...usr, role: 'user'} : usr));
-                                                }
+                                                confirmAction('Revoke Admin', `Remove admin privileges for ${u.email}?`, async () => {
+      const toastId = toast.loading('Updating...');
+      try {
+          await updateUserRole(u.id, 'user');
+          setUsersList(usersList.map(usr => usr.id === u.id ? {...usr, role: 'user'} : usr));
+          toast.success('User updated', { id: toastId });
+      } catch(e) { toast.error('Failed', { id: toastId }); }
+  });
                                             }} className="text-orange-600 font-bold text-sm bg-orange-50 px-4 py-2 rounded-lg hover:bg-orange-100">Revoke Admin</button>
                                         )}
                                     </div>
@@ -1398,7 +1497,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
                         </div>
                         <div className="mt-8 flex justify-end">
                             <button onClick={() => {
-                                saveSupportChannels(supportData).then(() => alert('Saved successfully!')).catch(e => alert(e.message));
+                                toast.promise(saveSupportChannels(supportData), { loading: 'Saving...', success: 'Saved successfully!', error: 'Failed to save settings' });
                             }} className="bg-primary hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-bold transition shadow-lg shadow-blue-500/20">
                                 Save Settings
                             </button>
@@ -1406,7 +1505,92 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
                       </div>
                   </motion.div>
               );
-          default:
+          
+        case 'profile':
+            return (
+                <motion.div initial={{opacity: 0, y: 20}} animate={{opacity: 1, y: 0}} className="max-w-2xl bg-white rounded-2xl shadow-sm border border-slate-100 p-6 md:p-8">
+                    <div className="flex items-center space-x-4 mb-8 pb-6 border-b border-slate-100">
+                        <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center text-primary">
+                            <UserCircle className="w-8 h-8" />
+                        </div>
+                        <div>
+                            <h2 className="text-2xl font-bold text-slate-900">Admin Profile</h2>
+                            <p className="text-sm font-medium text-slate-500">Manage your personal information and security.</p>
+                        </div>
+                    </div>
+                    
+                    <form onSubmit={async (e) => {
+                        e.preventDefault();
+                        const formData = new FormData(e.currentTarget);
+                        const displayName = formData.get('displayName') as string;
+                        const newPassword = formData.get('newPassword') as string;
+                        
+                        const promise = (async () => {
+                            if (auth.currentUser) {
+                                if (displayName && displayName !== auth.currentUser.displayName) {
+                                    await updateProfile(auth.currentUser, { displayName });
+                                }
+                                if (newPassword) {
+                                    if (newPassword.length < 6) throw new Error('Password must be at least 6 characters');
+                                    await updatePassword(auth.currentUser, newPassword);
+                                }
+                            } else {
+                                throw new Error('No authenticated user');
+                            }
+                        })();
+                        
+                        toast.promise(promise, {
+                            loading: 'Updating profile...',
+                            success: 'Profile updated successfully!',
+                            error: (err) => err.message || 'Failed to update profile'
+                        });
+                        
+                        e.currentTarget.reset();
+                    }} className="space-y-6">
+                        <div>
+                            <label className="block text-sm font-bold text-slate-700 mb-2">Display Name</label>
+                            <input 
+                                name="displayName"
+                                type="text" 
+                                defaultValue={auth.currentUser?.displayName || ''}
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none font-medium text-slate-700" 
+                                placeholder="Admin Name"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-bold text-slate-700 mb-2">Email Address (Read-Only)</label>
+                            <input 
+                                type="email" 
+                                disabled
+                                value={auth.currentUser?.email || ''}
+                                className="w-full px-4 py-3 bg-slate-100 border border-slate-200 rounded-xl text-slate-500 font-medium cursor-not-allowed" 
+                            />
+                        </div>
+                        <div className="pt-4 border-t border-slate-100 mt-6 !mb-2">
+                            <h3 className="text-lg font-bold text-slate-800">Change Password</h3>
+                            <p className="text-sm text-slate-500 mb-4">Leave blank to keep your current password.</p>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-bold text-slate-700 mb-2">New Password <span className="text-slate-400 font-normal">(min 6 chars)</span></label>
+                            <input 
+                                name="newPassword"
+                                type="password" 
+                                autoComplete="new-password"
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none font-medium text-slate-700" 
+                                placeholder="Enter new password"
+                            />
+                        </div>
+                        
+                        <div className="pt-6">
+                            <button type="submit" className="w-full sm:w-auto bg-primary hover:bg-blue-700 text-white px-8 py-3.5 rounded-xl font-bold transition shadow-lg shadow-blue-500/20">
+                                Save Profile Changes
+                            </button>
+                        </div>
+                    </form>
+                </motion.div>
+            );
+
+        default:
               return (
                   <motion.div initial={{opacity: 0, scale: 0.95}} animate={{opacity: 1, scale: 1}} className="flex flex-col items-center justify-center p-24 bg-white rounded-2xl border border-dashed border-slate-300">
                       <div className="w-20 h-20 bg-slate-100 rounded-3xl flex items-center justify-center mb-6 shadow-inner">
@@ -1421,7 +1605,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
   };
 
   return (
+    <>
+    <Toaster position="top-right" />
     <div className="min-h-screen bg-slate-50 flex font-sans">
+      {confirmOptions && (
+        <ConfirmDialog 
+          isOpen={confirmOptions.isOpen} 
+          title={confirmOptions.title} 
+          message={confirmOptions.message} 
+          onConfirm={confirmOptions.onConfirm} 
+          onCancel={() => setConfirmOptions(null)} 
+        />
+      )}
       {/* Sidebar Overlay for Mobile */}
       <AnimatePresence>
       {isSidebarOpen && (
@@ -1437,10 +1632,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
       <aside className={`fixed inset-y-0 left-0 bg-slate-900 z-40 w-72 transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} flex flex-col shadow-2xl border-r border-slate-800`}>
           <div className="h-20 flex items-center px-6 border-b border-slate-800 bg-slate-900 justify-between">
               <div className="flex items-center">
-                  <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center mr-3 shrink-0 shadow-lg shadow-primary/30">
-                      <Plane className="w-5 h-5 text-white" />
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center mr-3 shrink-0 shadow-lg shadow-primary/30 relative overflow-hidden group">
+                      <div className="absolute inset-0 bg-white/20 blur group-hover:blur-md transition-all duration-500 opacity-0 group-hover:opacity-100"></div>
+                      <Rocket className="w-5 h-5 text-white transform group-hover:scale-110 group-hover:-translate-y-1 group-hover:translate-x-1 transition-all duration-300 relative z-10" />
                   </div>
-                  <span className="text-white font-bold text-xl tracking-wide font-serif truncate">Admin Pro</span>
+                  <span className="font-bold text-xl tracking-wide font-sans truncate bg-clip-text text-transparent bg-gradient-to-r from-white via-blue-100 to-white animate-pulse">Admins Cockpit</span>
               </div>
               <button className="lg:hidden text-slate-400 hover:text-white transition" onClick={() => setSidebarOpen(false)}>
                   <X className="w-6 h-6" />
@@ -1481,7 +1677,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
                       {user?.email?.charAt(0).toUpperCase() || 'A'}
                   </div>
                   <div className="overflow-hidden flex-1">
-                      <div className="text-sm font-bold text-white truncate group-hover:text-primary transition-colors">Admin</div>
+                      <div className="text-sm font-bold text-white truncate group-hover:text-primary transition-colors">{user?.displayName || 'Admin'}</div>
                       <div className="text-[11px] font-medium text-slate-400 truncate mt-0.5" title={user?.email || ''}>{user?.email || 'admin@hqtravels.com'}</div>
                   </div>
                   <button onClick={handleLogout} className="ml-2 text-slate-400 hover:text-white transition-colors" title="Sign Out">
@@ -1510,10 +1706,77 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
                       System Operational
                   </div>
                   <div className="h-8 w-px bg-slate-200 hidden sm:block mx-2"></div>
-                  <button className="relative p-2 text-slate-500 hover:bg-slate-100 hover:text-primary rounded-xl transition-colors">
-                      <Bell className="w-6 h-6" />
-                      <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white shadow-sm"></span>
-                  </button>
+                  <div className="relative">
+                      <button onClick={() => setNotificationsOpen(!isNotificationsOpen)} className="relative p-2 text-slate-500 hover:bg-slate-100 hover:text-primary rounded-xl transition-colors">
+                          <Bell className="w-6 h-6" />
+                          {totalNotifications > 0 && <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white shadow-sm"></span>}
+                      </button>
+                      <AnimatePresence>
+                          {isNotificationsOpen && (
+                              <motion.div 
+                                  initial={{ opacity: 0, y: 10, scale: 0.95 }} 
+                                  animate={{ opacity: 1, y: 0, scale: 1 }} 
+                                  exit={{ opacity: 0, y: 10, scale: 0.95 }} 
+                                  className="absolute top-full right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden z-50 text-left"
+                              >
+                                  <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+                                      <h3 className="font-bold text-slate-800">Notifications</h3>
+                                      {totalNotifications > 0 && (
+                                          <span className="bg-primary text-white text-xs font-bold px-2 py-0.5 rounded-full">{totalNotifications} New</span>
+                                      )}
+                                  </div>
+                                  <div className="max-h-80 overflow-y-auto">
+                                      {totalNotifications === 0 ? (
+                                          <div className="p-6 text-center text-slate-500 text-sm font-semibold">
+                                              No new notifications.
+                                          </div>
+                                      ) : (
+                                          <div className="divide-y divide-slate-100">
+                                              {pendingConsultationsCount > 0 && (
+                                                  <div 
+                                                      className="p-4 hover:bg-slate-50 cursor-pointer transition-colors"
+                                                      onClick={() => {
+                                                          setActiveTab('bookings');
+                                                          setNotificationsOpen(false);
+                                                      }}
+                                                  >
+                                                      <div className="flex items-start gap-3">
+                                                          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                                                              <FileText className="w-4 h-4 text-primary" />
+                                                          </div>
+                                                          <div>
+                                                              <p className="text-sm text-slate-800 font-medium">You have <span className="font-bold text-primary">{pendingConsultationsCount}</span> pending consultation request{pendingConsultationsCount > 1 ? 's' : ''}.</p>
+                                                              <p className="text-xs text-slate-500 mt-1">Click to view in Bookings tab.</p>
+                                                          </div>
+                                                      </div>
+                                                  </div>
+                                              )}
+                                              {pendingBookingsCount > 0 && (
+                                                  <div 
+                                                      className="p-4 hover:bg-slate-50 cursor-pointer transition-colors"
+                                                      onClick={() => {
+                                                          setActiveTab('overview');
+                                                          setNotificationsOpen(false);
+                                                      }}
+                                                  >
+                                                      <div className="flex items-start gap-3">
+                                                          <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center shrink-0">
+                                                              <Ticket className="w-4 h-4 text-orange-500" />
+                                                          </div>
+                                                          <div>
+                                                              <p className="text-sm text-slate-800 font-medium">You have <span className="font-bold text-orange-600">{pendingBookingsCount}</span> pending flight booking{pendingBookingsCount > 1 ? 's' : ''}.</p>
+                                                              <p className="text-xs text-slate-500 mt-1">Click to view in Overview.</p>
+                                                          </div>
+                                                      </div>
+                                                  </div>
+                                              )}
+                                          </div>
+                                      )}
+                                  </div>
+                              </motion.div>
+                          )}
+                      </AnimatePresence>
+                  </div>
                   <button onClick={handleLogout} className="bg-slate-900 border border-slate-900 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-slate-800 transition shadow-lg shadow-slate-900/10 hidden sm:block">Log Out</button>
               </div>
           </header>
@@ -1771,7 +2034,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
                                     try {
                                         await updateConsultationStatus(selectedConsultation.id, newStatus);
                                     } catch (err) {
-                                        alert("Failed to update status");
+                                        toast.error('Failed to update status');
                                     }
                                 }}
                                 className={`text-sm font-bold px-3 py-1.5 rounded-lg border-2 outline-none appearance-none cursor-pointer ${
@@ -1792,10 +2055,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
                                     try {
                                         await updateConsultationNotes(selectedConsultation.id, consultationNotes);
                                         setConsultations(prev => prev.map(c => c.id === selectedConsultation.id ? {...c, notes: consultationNotes} : c));
-                                        alert('Notes saved successfully');
+                                        toast.success('Notes saved successfully');
                                         setConsultationModalOpen(false);
                                     } catch(e) {
-                                        alert('Failed to save notes');
+                                        toast.error('Failed to save notes');
                                     }
                                 }} 
                                 className="px-5 py-2.5 rounded-xl font-bold text-white bg-primary hover:bg-blue-700 transition"
@@ -1809,6 +2072,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
         )}
       </AnimatePresence>
     </div>
+    </>
   );
 };
 

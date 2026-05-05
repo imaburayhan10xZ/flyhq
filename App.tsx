@@ -46,6 +46,8 @@ const App: React.FC = () => {
   
   // Features Config State
   const [features, setFeatures] = useState<any>({
+      brandName: 'HQ TRAVELS',
+      showBrandName: true,
       topNavHomeEnabled: true,
       topNavHotelsEnabled: true,
       topNavHolidaysEnabled: true,

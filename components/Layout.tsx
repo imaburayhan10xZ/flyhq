@@ -11,15 +11,11 @@ interface LayoutProps {
 }
 
 const Layout: React.FC<LayoutProps> = ({ children, customLogo }) => {
-  const [imgError, setImgError] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [supportData, setSupportData] = useState<any>(null);
   const location = useLocation();
   const currentPage = location.pathname === '/' ? 'home' : location.pathname.substring(1);
   const features = useContext(FeaturesContext);
-
-  // Use customLogo if available, otherwise try local file, then fallback
-  const logoSource = customLogo || "/logo.png";
 
   useEffect(() => {
     const handleScroll = () => {
@@ -42,33 +38,25 @@ const Layout: React.FC<LayoutProps> = ({ children, customLogo }) => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16 md:h-20 transition-all"> 
             
-            <Link to="/" className="flex items-center cursor-pointer group">
-              {!imgError || customLogo ? (
-                <img 
-                    src={logoSource}
-                    alt="HQ Travels & Tours" 
-                    className="h-16 md:h-20 w-auto object-contain transition-transform group-hover:scale-105"
-                    onError={(e) => {
-                        if (logoSource === customLogo && !imgError) {
-                             setImgError(true);
-                        } else {
-                             setImgError(true);
-                        }
-                        e.currentTarget.style.display = 'none';
-                    }}
-                />
-              ) : null}
-
-              {(imgError && !customLogo) || (imgError && customLogo) ? (
-                /* Fallback Logo */
-                <div className="flex flex-col justify-center h-full pl-2">
-                    <span className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight leading-none font-serif group-hover:text-primary transition-colors">HQ TRAVELS</span>
-                    <div className="flex items-center justify-between w-full mt-1">
-                            <span className="text-[10px] md:text-xs text-secondary font-bold tracking-[0.2em] uppercase">& TOURS</span>
-                            <span className="text-[8px] md:text-[10px] text-slate-400 italic ml-3 font-medium">Let's Fly Higher</span>
-                    </div>
-                </div>
-              ) : null}
+            <Link to="/" className="flex items-center cursor-pointer group gap-3">
+              <img 
+                  src={customLogo || "/favicon.png"}
+                  alt={features.brandName || "HQ Travels"} 
+                  className="h-12 md:h-14 w-auto object-contain transition-transform group-hover:scale-105"
+                  onError={(e) => {
+                       // Try .ico if .png fails
+                       if (e.currentTarget.src.includes('favicon.png')) {
+                           e.currentTarget.src = customLogo || "/favicon.ico";
+                       } else {
+                           e.currentTarget.style.display = 'none';
+                       }
+                  }}
+              />
+              {(features.showBrandName ?? true) && (
+                  <span className="text-xl md:text-2xl font-black tracking-tight text-[#0f172a]">
+                      {features.brandName || "HQ TRAVELS"}
+                  </span>
+              )}
             </Link>
             
             <nav className="hidden lg:flex items-center space-x-1">
@@ -149,26 +137,16 @@ const Layout: React.FC<LayoutProps> = ({ children, customLogo }) => {
             {/* Brand Column */}
             <div className="md:col-span-4">
               <div className="flex items-center mb-8">
-                 {!imgError || customLogo ? (
-                    <img 
-                        src={logoSource}
-                        alt="HQ Travels" 
-                        className="h-16 w-auto brightness-0 invert opacity-90"
-                        onError={(e) => {
-                             if (!customLogo && !imgError) setImgError(true);
-                             e.currentTarget.style.display = 'none';
-                        }} 
-                    />
-                 ) : null}
-                 
-                 {(imgError && !customLogo) || (imgError && customLogo) ? (
-                     <div className="flex items-center">
-                        <span className="text-2xl font-bold tracking-wider font-serif">HQ TRAVELS & TOURS</span>
-                     </div>
-                 ) : null}
+                  <div className="w-10 h-10 md:w-12 md:h-12 bg-white/10 rounded-full flex items-center justify-center mr-3 relative overflow-hidden group">
+                      <div className="absolute inset-0 border-[1.5px] border-white/20 rounded-full opacity-50 group-hover:scale-110 transition-transform"></div>
+                      <Plane className="h-5 w-5 md:h-6 md:w-6 text-white transform -rotate-45 relative z-10 group-hover:text-secondary group-hover:-translate-y-1 group-hover:translate-x-1 transition-all" />
+                  </div>
+                  <div className="flex flex-col">
+                      <span className="text-xl md:text-2xl font-bold tracking-widest font-sans text-white uppercase" style={{fontFamily: "'Space Grotesk', sans-serif"}}>{features.brandName || "HQ TRAVELS"}</span>
+                      <span className="text-[9px] md:text-[10px] text-secondary font-extrabold tracking-[0.3em] uppercase mt-0.5">Let's Fly Higher</span>
+                  </div>
               </div>
-              <p className="text-slate-400 text-base leading-relaxed mb-8 max-w-sm">
-                <span className="text-secondary font-bold text-lg block mb-2">Let's Fly Higher.</span>
+              <p className="text-slate-400 text-sm md:text-base leading-relaxed mb-8 max-w-sm">
                 Your trusted partner for hassle-free travel, real-time booking, and unforgettable journeys across the globe. We make every trip a masterpiece.
               </p>
               

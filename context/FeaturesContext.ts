@@ -32,4 +32,6 @@ export const FeaturesContext = React.createContext<{
     blogEnabled?: boolean;
     careersEnabled?: boolean;
     pressEnabled?: boolean;
+    brandName?: string;
+    showBrandName?: boolean;
 }>({});
