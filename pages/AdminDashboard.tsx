@@ -16,23 +16,25 @@ import { updateProfile, updatePassword } from 'firebase/auth';
 import { auth } from '../firebase';
 import toast, { Toaster } from 'react-hot-toast';
 import { ConfirmDialog } from '../components/ConfirmDialog';
-import { UserCircle } from 'lucide-react';
-import { getHotelOffers, saveHotelOffer, deleteHotelOffer, getHolidayPackages, saveHolidayPackage, deleteHolidayPackage, getVisaServices, saveVisaService, deleteVisaService, getPageData, savePageData, getJobs, saveJob, deleteJob, getPressReleases, savePressRelease, deletePressRelease, getBlogPosts, saveBlogPost, deleteBlogPost, getSupportChannels, saveSupportChannels, getDestinations, saveDestination, deleteDestination, getAdminFlights, saveAdminFlight, deleteAdminFlight, getUsers, updateUserRole, getPaymentMethodsConfig, savePaymentMethodsConfig, getFeaturesConfig, saveFeaturesConfig, getConsultations, updateConsultationStatus, updateConsultationNotes } from '../services/firebaseService';
+import { UserCircle, Server } from 'lucide-react';
+import { getHotelOffers, saveHotelOffer, deleteHotelOffer, getHolidayPackages, saveHolidayPackage, deleteHolidayPackage, getVisaServices, saveVisaService, deleteVisaService, getPageData, savePageData, getJobs, saveJob, deleteJob, getPressReleases, savePressRelease, deletePressRelease, getBlogPosts, saveBlogPost, deleteBlogPost, getSupportChannels, saveSupportChannels, getDestinations, saveDestination, deleteDestination, getAdminFlights, saveAdminFlight, deleteAdminFlight, getUsers, updateUserRole, updateUserRoleAndPermissions, getPaymentMethodsConfig, savePaymentMethodsConfig, getFeaturesConfig, saveFeaturesConfig, getConsultations, updateConsultationStatus, updateConsultationNotes } from '../services/firebaseService';
 
 interface AdminDashboardProps {
     onLogoUpdate?: (url: string) => void;
     currentLogo?: string;
+    isDevRoute?: boolean;
 }
 
-type TabType = 'overview' | 'bookings' | 'flights' | 'destinations' | 'hotels' | 'holidays' | 'visa' | 'pages' | 'careers' | 'press' | 'blog' | 'users' | 'settings' | 'support_channels' | 'payment_methods' | 'profile';
+type TabType = 'overview' | 'bookings' | 'flights' | 'destinations' | 'hotels' | 'holidays' | 'visa' | 'pages' | 'careers' | 'press' | 'blog' | 'users' | 'settings' | 'support_channels' | 'payment_methods' | 'profile' | 'machine_control';
 
-const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLogo }) => {
-  const { user, isAdmin, loading, signInWithGoogle, signInWithEmail, logout } = useAuth();
+const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLogo, isDevRoute }) => {
+  const { user, isAdmin, role, permissions, loading, signInWithGoogle, signInWithEmail, logout } = useAuth();
   const navigate = useNavigate();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState('');
+  const [devClicks, setDevClicks] = useState(0);
 
   const handleEmailSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -136,7 +138,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
 
   const openModal = (type: 'hotel'|'holiday'|'visa'|'career'|'press'|'blog'|'destination'|'flight', data?: any) => {
       setModalType(type);
-      setFormData(data || {});
+      if (data) {
+          setFormData(data);
+      } else {
+          const initialData: any = {};
+          if (type === 'blog') {
+              initialData.author = user?.displayName || user?.email?.split('@')[0] || 'Admin';
+          }
+          setFormData(initialData);
+      }
       setModalOpen(true);
   };
 
@@ -305,19 +315,28 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
      return <div className="min-h-screen flex items-center justify-center bg-slate-50"><Loader2 className="w-10 h-10 animate-spin text-primary" /></div>;
   }
 
-  if (!user || !isAdmin) {
+  const isAuthorized = user && (isDevRoute ? role === 'developer' : isAdmin);
+  
+  if (!isAuthorized) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 font-sans p-4">
         <div className="max-w-md w-full bg-white p-8 rounded-3xl shadow-xl border border-slate-100 flex flex-col items-center">
             <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mb-6">
                 <ShieldCheck className="w-10 h-10 text-primary" />
             </div>
-            <h1 className="text-2xl font-bold text-slate-900 mb-2 font-serif">Admin Portal</h1>
+            <h1 className="text-2xl font-bold text-slate-900 mb-2 font-serif">{isDevRoute ? "Devs Console" : "Admin Portal"}</h1>
             <p className="text-slate-500 text-center mb-8 font-medium">
-              {user ? "You don't have admin privileges." : "Sign in to access the control panel."}
+              {user ? (isDevRoute && role !== 'developer' ? "You don't have developer privileges." : "You don't have admin privileges.") : "Sign in to access the control panel."}
             </p>
             {user ? (
                <button onClick={handleLogout} className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 px-4 rounded-xl transition">Sign Out</button>
+            ) : isDevRoute ? (
+                <div className="w-full text-center">
+                    <button onClick={signInWithGoogle} className="w-full bg-white border border-slate-200 hover:bg-slate-50 text-slate-900 font-bold py-3 px-4 rounded-xl transition flex items-center justify-center">
+                        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5 mr-3" />
+                        Sign in as Developer
+                    </button>
+                </div>
             ) : (
                 <div className="w-full">
                     <form onSubmit={handleEmailSignIn} className="flex flex-col gap-4 mb-6">
@@ -455,7 +474,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
   const pendingBookingsCount = bookings.filter(b => b.status === 'PENDING').length;
   const totalNotifications = pendingConsultationsCount + pendingBookingsCount;
 
-  const TABS = [
+  const ALL_TABS = [
       { id: 'overview', label: 'Dashboard', icon: LayoutDashboard },
       { id: 'bookings', label: 'Consultations & Bookings', icon: Ticket },
       { id: 'flights', label: 'Flight Inventory', icon: Plane },
@@ -469,12 +488,28 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
       { id: 'blog', label: 'Travel Blog', icon: FileText },
       { id: 'support_channels', label: 'Support Channels', icon: Phone },
       { id: 'users', label: 'User Management', icon: Users },
-      { id: 'profile', label: 'Admin Profile', icon: UserCircle },
       { id: 'payment_methods', label: 'Payment Methods', icon: CreditCard },
       { id: 'settings', label: 'Platform Settings', icon: Settings },
+      { id: 'machine_control', label: 'Machine Control', icon: Server },
   ];
 
+  const TABS = ALL_TABS.filter(tab => {
+      if (tab.id === 'machine_control') return role === 'developer';
+      if (role === 'developer' || role === 'super_admin' || role === 'admin') return true;
+      if (role === 'manager') return tab.id !== 'users';
+      if (role === 'moderator') return permissions?.includes(tab.id) || tab.id === 'overview';
+      return false; // Default for normal users, though they shouldn't even reach the dashboard usually
+  });
+
   const renderContent = () => {
+      // Security check
+      if (role === 'manager' && activeTab === 'users') {
+          return <div className="p-10 text-center text-slate-500"><h2 className="text-2xl font-bold">Access Denied</h2><p>You do not have permission to view this section.</p></div>;
+      }
+      if (role === 'moderator' && activeTab !== 'overview' && activeTab !== 'profile' && !(permissions || []).includes(activeTab)) {
+          return <div className="p-10 text-center text-slate-500"><h2 className="text-2xl font-bold">Access Denied</h2><p>You do not have permission to view this section.</p></div>;
+      }
+
       switch(activeTab) {
           case 'overview':
               return (
@@ -1361,42 +1396,81 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
                       <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between bg-slate-50/50">
                           <div>
                               <h2 className="text-xl font-bold text-slate-900">User & Admin Management</h2>
-                              <p className="text-sm font-medium text-slate-500 mt-1">Manage users and grant admin privileges. To add a new admin, ask them to sign in first, then grant them Admin here.</p>
+                              <p className="text-sm font-medium text-slate-500 mt-1">Manage users, adjust roles, and set specific permissions for moderators.</p>
                           </div>
                       </div>
-                      <div className="p-6">
+                      <div className="p-6 space-y-4">
                             {usersList.map((u: any) => (
-                                <div key={u.id} className="flex justify-between items-center bg-slate-50 p-4 rounded-xl border border-slate-100 mb-4">
-                                    <div>
-                                        <h4 className="font-bold text-slate-900">{u.email}</h4>
-                                        <p className="text-sm text-slate-500 capitalize">Role: <span className={u.role === 'admin' ? 'text-green-600 font-bold' : ''}>{u.role || 'user'}</span></p>
+                                <div key={u.id} className="bg-slate-50 p-4 font-sans rounded-xl border border-slate-200">
+                                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                        <div>
+                                            <h4 className="font-bold text-slate-900 text-lg">{u.email}</h4>
+                                            <p className="text-sm text-slate-500 capitalize">Role: <span className="font-bold text-primary">{u.role || 'user'}</span></p>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2 items-center">
+                                            <select 
+                                                className="bg-white border text-sm font-medium border-slate-300 text-slate-700 rounded-lg px-3 py-2 outline-none focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                                                value={u.role || 'user'}
+                                                disabled={u.role === 'developer' && role !== 'developer'}
+                                                onChange={async (e) => {
+                                                    const newRole = e.target.value;
+                                                    if(u.email === user?.email) {
+                                                        toast.error("You cannot change your own role here.");
+                                                        return;
+                                                    }
+                                                    confirmAction('Change Role', `Are you sure you want to change ${u.email}'s role to ${newRole}?`, async () => {
+                                                        const toastId = toast.loading('Updating role...');
+                                                        try {
+                                                            await updateUserRoleAndPermissions(u.id, newRole, u.permissions || []);
+                                                            setUsersList(usersList.map(usr => usr.id === u.id ? {...usr, role: newRole} : usr));
+                                                            toast.success('Role updated', { id: toastId });
+                                                        } catch(err) { toast.error('Failed to update', { id: toastId }); }
+                                                    });
+                                                }}
+                                            >
+                                                <option value="user">User</option>
+                                                <option value="moderator">Moderator</option>
+                                                <option value="manager">Manager</option>
+                                                {(role === 'developer' || role === 'super_admin' || role === 'admin' || u.role === 'admin' || u.role === 'super_admin') && <option value="super_admin">Super Admin</option>}
+                                                {role === 'developer' && <option value="developer">Developer</option>}
+                                            </select>
+                                        </div>
                                     </div>
-                                    <div className="flex gap-2">
-                                        {u.role !== 'admin' && (
-                                            <button onClick={async () => {
-                                                confirmAction('Make Admin', `Make ${u.email} an admin?`, async () => {
-      const toastId = toast.loading('Updating...');
-      try {
-          await updateUserRole(u.id, 'admin');
-          setUsersList(usersList.map(usr => usr.id === u.id ? {...usr, role: 'admin'} : usr));
-          toast.success('User updated', { id: toastId });
-      } catch(e) { toast.error('Failed', { id: toastId }); }
-  });
-                                            }} className="text-blue-600 font-bold text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100">Make Admin</button>
-                                        )}
-                                        {u.role === 'admin' && u.email !== user?.email && (
-                                            <button onClick={async () => {
-                                                confirmAction('Revoke Admin', `Remove admin privileges for ${u.email}?`, async () => {
-      const toastId = toast.loading('Updating...');
-      try {
-          await updateUserRole(u.id, 'user');
-          setUsersList(usersList.map(usr => usr.id === u.id ? {...usr, role: 'user'} : usr));
-          toast.success('User updated', { id: toastId });
-      } catch(e) { toast.error('Failed', { id: toastId }); }
-  });
-                                            }} className="text-orange-600 font-bold text-sm bg-orange-50 px-4 py-2 rounded-lg hover:bg-orange-100">Revoke Admin</button>
-                                        )}
-                                    </div>
+                                    
+                                    {u.role === 'moderator' && (
+                                        <div className="mt-4 pt-4 border-t border-slate-200">
+                                            <h5 className="font-bold text-slate-700 text-sm mb-3">Moderator Permissions: Select Sections</h5>
+                                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                                                {ALL_TABS.map(tab => {
+                                                    if (tab.id === 'users' || tab.id === 'overview' || tab.id === 'profile') return null;
+                                                    const isChecked = (u.permissions || []).includes(tab.id);
+                                                    return (
+                                                        <label key={tab.id} className="flex items-center space-x-2 cursor-pointer group">
+                                                            <input 
+                                                                type="checkbox" 
+                                                                className="rounded border-slate-300 text-primary focus:ring-primary h-4 w-4"
+                                                                checked={isChecked}
+                                                                onChange={async (e) => {
+                                                                    const checked = e.target.checked;
+                                                                    let newPerms = [...(u.permissions || [])];
+                                                                    if (checked) newPerms.push(tab.id);
+                                                                    else newPerms = newPerms.filter(p => p !== tab.id);
+                                                                    
+                                                                    const toastId = toast.loading('Updating permissions...');
+                                                                    try {
+                                                                        await updateUserRoleAndPermissions(u.id, u.role, newPerms);
+                                                                        setUsersList(usersList.map(usr => usr.id === u.id ? {...usr, permissions: newPerms} : usr));
+                                                                        toast.success('Permissions updated', { id: toastId });
+                                                                    } catch(err) { toast.error('Failed', { id: toastId }); }
+                                                                }}
+                                                            />
+                                                            <span className="text-sm font-medium text-slate-600 group-hover:text-slate-900 transition-colors">{tab.label}</span>
+                                                        </label>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                       </div>
@@ -1506,6 +1580,72 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
                   </motion.div>
               );
           
+        case 'machine_control':
+            return (
+                <motion.div initial={{opacity: 0, scale: 0.98}} animate={{opacity: 1, scale: 1}} className="max-w-4xl">
+                    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                        <div className="p-6 md:p-8 border-b border-slate-100 flex items-center gap-4">
+                            <div className="p-3 bg-red-50 text-red-600 rounded-xl">
+                                <Server className="w-8 h-8" />
+                            </div>
+                            <div>
+                                <h2 className="text-2xl font-bold text-slate-900">Machine Control</h2>
+                                <p className="text-slate-500 mt-1 font-medium">Developer tools for system-wide configuration.</p>
+                            </div>
+                        </div>
+
+                        <div className="p-6 md:p-8">
+                            <div className="bg-slate-50 rounded-xl p-6 border border-slate-200">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div>
+                                        <h3 className="text-lg font-bold text-slate-900">Site Maintenance Mode</h3>
+                                        <p className="text-sm text-slate-500">When enabled, the user website and regular admin panel will be unavailable. Only developers can bypass this.</p>
+                                    </div>
+                                    <label className="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" className="sr-only peer" checked={featuresConfig.maintenanceMode || false} onChange={async (e) => {
+                                            const newVal = e.target.checked;
+                                            const newConfig = {...featuresConfig, maintenanceMode: newVal};
+                                            setFeaturesConfig(newConfig);
+                                            const toastId = toast.loading('Saving...');
+                                            try {
+                                                await saveFeaturesConfig(newConfig);
+                                                toast.success('Settings saved', {id: toastId});
+                                            } catch(err) { toast.error('Failed to save', {id: toastId}); }
+                                        }} />
+                                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                                    </label>
+                                </div>
+                                {featuresConfig.maintenanceMode && (
+                                    <div className="mt-4 animate-in fade-in slide-in-from-top-2">
+                                        <label className="block text-sm font-bold text-slate-700 mb-2">Maintenance Note (Displayed to Users)</label>
+                                        <textarea
+                                            className="w-full bg-white border border-slate-300 rounded-xl p-4 font-medium h-32 outline-none focus:border-primary disabled:opacity-50"
+                                            placeholder="We are currently performing scheduled maintenance..."
+                                            value={featuresConfig.maintenanceNote || ''}
+                                            onChange={(e) => setFeaturesConfig({...featuresConfig, maintenanceNote: e.target.value})}
+                                        ></textarea>
+                                        <div className="flex justify-end mt-4">
+                                            <button 
+                                                className="bg-primary text-white font-bold py-2 px-6 rounded-xl shadow hover:bg-primary/90 transition disabled:opacity-50"
+                                                onClick={async () => {
+                                                    const toastId = toast.loading('Saving note...');
+                                                    try {
+                                                        await saveFeaturesConfig(featuresConfig);
+                                                        toast.success('Note saved', {id: toastId});
+                                                    } catch(err) { toast.error('Failed to save', {id: toastId}); }
+                                                }}
+                                            >
+                                                Save Note
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </motion.div>
+            );
+
         case 'profile':
             return (
                 <motion.div initial={{opacity: 0, y: 20}} animate={{opacity: 1, y: 0}} className="max-w-2xl bg-white rounded-2xl shadow-sm border border-slate-100 p-6 md:p-8">
@@ -1672,7 +1812,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
           </div>
           
           <div className="p-4 border-t border-slate-800 bg-slate-900/50 mt-auto">
-              <div className="flex items-center p-3 bg-slate-800/80 rounded-2xl border border-slate-700/50 hover:bg-slate-800 cursor-pointer transition-colors group relative">
+              <div 
+                className="flex items-center p-3 bg-slate-800/80 rounded-2xl border border-slate-700/50 hover:bg-slate-800 cursor-pointer transition-colors group relative"
+                onClick={() => { setActiveTab('profile'); if(window.innerWidth < 1024) setSidebarOpen(false); }}
+              >
                   <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold mr-3 shrink-0 shadow-lg group-hover:scale-105 transition-transform">
                       {user?.email?.charAt(0).toUpperCase() || 'A'}
                   </div>
@@ -1680,7 +1823,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
                       <div className="text-sm font-bold text-white truncate group-hover:text-primary transition-colors">{user?.displayName || 'Admin'}</div>
                       <div className="text-[11px] font-medium text-slate-400 truncate mt-0.5" title={user?.email || ''}>{user?.email || 'admin@hqtravels.com'}</div>
                   </div>
-                  <button onClick={handleLogout} className="ml-2 text-slate-400 hover:text-white transition-colors" title="Sign Out">
+                  <button onClick={e => { e.stopPropagation(); handleLogout(); }} className="ml-2 text-slate-400 hover:text-white transition-colors" title="Sign Out">
                       <LogOut className="w-4 h-4" />
                   </button>
               </div>
@@ -1785,7 +1928,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
           <main className="flex-1 p-6 lg:p-10 overflow-x-hidden">
               <div className="mb-8">
                   <h1 className="text-3xl font-extrabold text-slate-900 mb-2 font-serif tracking-tight">
-                      {TABS.find(t => t.id === activeTab)?.label}
+                      {activeTab === 'profile' ? 'Admin Profile' : TABS.find(t => t.id === activeTab)?.label}
                   </h1>
                   <p className="text-slate-500 text-base font-medium">Manage your {siteName} operations and settings smoothly.</p>
               </div>
@@ -1845,7 +1988,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
                         {modalType === 'blog' && (
                             <>
                                 <div><label className="text-sm font-bold text-slate-700 block mb-1">Post Title</label><input type="text" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 font-medium" placeholder="Top 10 Beaches" value={formData.title} onChange={e=>setFormData({...formData, title: e.target.value})} /></div>
-                                <div><label className="text-sm font-bold text-slate-700 block mb-1">Author</label><input type="text" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 font-medium" placeholder="Jane Doe" value={formData.author} onChange={e=>setFormData({...formData, author: e.target.value})} /></div>
+                                <div><label className="text-sm font-bold text-slate-700 block mb-1">Author</label><input type="text" className={`w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 font-medium ${role === 'moderator' ? 'opacity-70 cursor-not-allowed' : ''}`} placeholder="Jane Doe" value={formData.author || ''} onChange={e=>setFormData({...formData, author: e.target.value})} readOnly={role === 'moderator'} /></div>
                                 <div><label className="text-sm font-bold text-slate-700 block mb-1">Excerpt</label><input type="text" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 font-medium" placeholder="A short summary..." value={formData.excerpt} onChange={e=>setFormData({...formData, excerpt: e.target.value})} /></div>
                                 <div><label className="text-sm font-bold text-slate-700 block mb-1">Content (Markdown)</label><textarea className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 font-medium h-32 resize-none" placeholder="Blog content..." value={formData.content || ''} onChange={e=>setFormData({...formData, content: e.target.value})}></textarea></div>
                             </>

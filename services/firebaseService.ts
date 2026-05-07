@@ -189,6 +189,19 @@ export const updateUserRole = async (id: string, role: string) => {
     }
 }
 
+export const updateUserRoleAndPermissions = async (id: string, role: string, permissions: string[]) => {
+    const path = `users/${id}`;
+    try {
+        await updateDoc(doc(db, 'users', id), {
+            role: role,
+            permissions: permissions
+        });
+    } catch (error) {
+        handleFirestoreError(error, OperationType.WRITE, path);
+        throw error;
+    }
+}
+
 // -- Hotel Offers --
 export const getHotelOffers = async () => {
     const path = 'hotelOffers';

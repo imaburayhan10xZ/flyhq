@@ -15,16 +15,30 @@ service cloud.firestore {
       return isSignedIn() && (
         request.auth.token.email == 'aburayhan10x@gmail.com' ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) 
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'super_admin', 'manager', 'moderator', 'developer'])
       ); 
     }
 
+    function isSuperAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'aburayhan10x@gmail.com' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) 
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'super_admin', 'developer'])
+      );
+    }
+    
+    function isDeveloper() {
+      return isSignedIn() && (
+        request.auth.token.email == 'aburayhan10x@gmail.com' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'developer')
+      );
+    }
+    
     match /users/{userId} {
       function isValidUser(data) {
         return data.keys().hasAll(['email', 'role', 'createdAt'])
-            && data.keys().size() <= 5
             && data.email is string && data.email.size() <= 200
-            && data.role is string && (data.role == 'user' || data.role == 'admin')
+            && data.role is string && (data.role in ['user', 'admin', 'super_admin', 'manager', 'moderator', 'developer'])
             && data.createdAt is timestamp;
       }
       
@@ -33,12 +47,15 @@ service cloud.firestore {
       allow create: if isSignedIn() 
                     && request.auth.uid == userId 
                     && isValidUser(incoming())
-                    && incoming().role == 'user'
+                    && incoming().role in ['user', 'super_admin', 'developer']
                     && incoming().createdAt == request.time;
       allow update: if isSignedIn() 
-                    && (request.auth.uid == userId || isAdmin())
+                    && (request.auth.uid == userId || isSuperAdmin())
                     && isValidUser(incoming())
-                    && (isAdmin() || incoming().role == existing().role)
+                    && (
+                        isDeveloper() || isSuperAdmin() || 
+                        (incoming().role == existing().role && incoming().get('permissions', []) == existing().get('permissions', []))
+                    )
                     && incoming().createdAt == existing().createdAt;
     }
 

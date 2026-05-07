@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { ShieldAlert } from 'lucide-react';
 import Layout from './components/Layout';
 import HomePage from './pages/HomePage';
 import SearchResultsPage from './pages/SearchResultsPage';
@@ -48,6 +49,8 @@ const App: React.FC = () => {
   const [features, setFeatures] = useState<any>({
       brandName: 'HQ TRAVELS',
       showBrandName: true,
+      maintenanceMode: false,
+      maintenanceNote: 'Our site is currently undergoing maintenance. Please check back later.',
       topNavHomeEnabled: true,
       topNavHotelsEnabled: true,
       topNavHolidaysEnabled: true,
@@ -119,10 +122,28 @@ const App: React.FC = () => {
     navigate('/confirmation');
   };
 
+  const { pathname } = useLocation();
+  const isDevRoute = pathname.startsWith('/devhubs');
+
+  if (features.maintenanceMode && !isDevRoute) {
+      return (
+          <div className="min-h-screen flex items-center justify-center bg-slate-50 font-sans p-4">
+              <div className="max-w-md w-full bg-white p-8 rounded-3xl shadow-xl border border-slate-100 flex flex-col items-center text-center">
+                  <ShieldAlert className="w-16 h-16 text-orange-500 mb-6" />
+                  <h1 className="text-2xl font-bold text-slate-900 mb-4">Under Maintenance</h1>
+                  <p className="text-slate-600 font-medium whitespace-pre-wrap">{features.maintenanceNote || 'Our site is currently undergoing maintenance. Please check back later.'}</p>
+              </div>
+          </div>
+      );
+  }
+
   return (
     <FeaturesContext.Provider value={features}>
       <ScrollToTop />
       <Routes>
+        {/* Dev Route - No Layout */}
+        <Route path="/devhubs/*" element={<AdminDashboard onLogoUpdate={handleLogoUpdate} currentLogo={logoUrl} isDevRoute={true} />} />
+
         {/* Admin Route - No Layout */}
         <Route path="/cmsadmin/*" element={<AdminDashboard onLogoUpdate={handleLogoUpdate} currentLogo={logoUrl} />} />
 
