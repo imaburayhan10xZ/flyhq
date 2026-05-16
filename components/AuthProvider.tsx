@@ -14,6 +14,7 @@ interface AuthContextType {
   role: string | null;
   permissions: string[];
   loading: boolean;
+  innerAuthError: string | null;
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, pass: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -27,6 +28,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [role, setRole] = useState<string | null>(null);
   const [permissions, setPermissions] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [innerAuthError, setInnerAuthError] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -35,39 +37,62 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Check if admin
         try {
            const userDocRef = doc(db, 'users', user.uid);
-           const userDoc = await getDoc(userDocRef);
+           let userDoc;
+           try {
+               userDoc = await getDoc(userDocRef);
+           } catch (getErr: any) {
+               console.error("Error with getDoc:", getErr);
+               throw getErr;
+           }
            
            let userRole = 'user';
            let userPerms: string[] = [];
            
-           if (userDoc.exists()) {
+           if (userDoc && userDoc.exists()) {
                const data = userDoc.data() as UserProfile;
-               userRole = data.role;
+               userRole = data.role || 'user';
                userPerms = data.permissions || [];
+               
+               // Force update to developer if they are the hardcoded master email
+               if (user.email && user.email.toLowerCase() === 'aburayhan10x@gmail.com' && userRole !== 'developer') {
+                   userRole = 'developer';
+                   try {
+                       await setDoc(userDocRef, { role: 'developer' }, { merge: true });
+                   } catch (e) {
+                       console.error("Failed to upgrade role to developer", e);
+                   }
+               }
            } else {
                // First time login - create standard user profile
-               userRole = user.email === 'aburayhan10x@gmail.com' ? 'developer' : 'user';
-               await setDoc(userDocRef, {
-                   email: user.email,
-                   role: userRole,
-                   createdAt: serverTimestamp()
-               });
+               userRole = user.email && user.email.toLowerCase() === 'aburayhan10x@gmail.com' ? 'developer' : 'user';
+               try {
+                   await setDoc(userDocRef, {
+                       email: user.email || '',
+                       role: userRole,
+                       createdAt: serverTimestamp()
+                   });
+               } catch (setErr: any) {
+                   console.error("Error with setDoc:", setErr);
+                   // Do not throw to allow login in memory
+               }
            }
            
            setRole(userRole);
            setPermissions(userPerms);
-           // consider anyone with these roles as an admin broadly
            setIsAdmin(userRole === 'admin' || userRole === 'super_admin' || userRole === 'manager' || userRole === 'moderator' || userRole === 'developer');
-        } catch (e) {
+           setInnerAuthError(null);
+        } catch (e: any) {
            console.error("Error fetching user profile", e);
            setIsAdmin(false);
            setRole(null);
            setPermissions([]);
+           setInnerAuthError(e.message || String(e));
         }
       } else {
         setIsAdmin(false);
         setRole(null);
         setPermissions([]);
+        setInnerAuthError(null);
       }
       setLoading(false);
     });
@@ -86,7 +111,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = () => signOut(auth);
 
   return (
-    <AuthContext.Provider value={{ user, isAdmin, role, permissions, loading, signInWithGoogle, signInWithEmail, logout }}>
+    <AuthContext.Provider value={{ user, isAdmin, role, permissions, loading, innerAuthError, signInWithGoogle, signInWithEmail, logout }}>
       {!loading && children}
     </AuthContext.Provider>
   );

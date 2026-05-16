@@ -7,17 +7,21 @@ import {
   LayoutDashboard, Ticket, DollarSign, Users, Upload, Image as ImageIcon, 
   Loader2, CheckCircle, Search, Menu, Settings, Plane, BedDouble, 
   Plus, Edit2, Trash2, Bell, ChevronRight, MoreVertical, X, LogIn, ShieldCheck,
-  Palmtree, FileText, Phone, LogOut, CreditCard, ToggleLeft, ToggleRight, Mail, Rocket
+  Palmtree, FileText, Phone, LogOut, CreditCard, ToggleLeft, ToggleRight, Mail, Rocket, AlertCircle
 } from 'lucide-react';
 import { uploadImage } from '../services/cloudinaryService';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../components/AuthProvider';
 import { updateProfile, updatePassword } from 'firebase/auth';
-import { auth } from '../firebase';
+import { auth, db } from '../firebase';
+import { initializeApp, getApps } from 'firebase/app';
+import { getAuth as getSecondaryAuth, createUserWithEmailAndPassword as secondaryCreateUser } from 'firebase/auth';
+import firebaseConfig from '../firebase-applet-config.json';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import toast, { Toaster } from 'react-hot-toast';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { UserCircle, Server } from 'lucide-react';
-import { getHotelOffers, saveHotelOffer, deleteHotelOffer, getHolidayPackages, saveHolidayPackage, deleteHolidayPackage, getVisaServices, saveVisaService, deleteVisaService, getPageData, savePageData, getJobs, saveJob, deleteJob, getPressReleases, savePressRelease, deletePressRelease, getBlogPosts, saveBlogPost, deleteBlogPost, getSupportChannels, saveSupportChannels, getDestinations, saveDestination, deleteDestination, getAdminFlights, saveAdminFlight, deleteAdminFlight, getUsers, updateUserRole, updateUserRoleAndPermissions, getPaymentMethodsConfig, savePaymentMethodsConfig, getFeaturesConfig, saveFeaturesConfig, getConsultations, updateConsultationStatus, updateConsultationNotes } from '../services/firebaseService';
+import { getUploadConfig, saveUploadConfig, getHotelOffers, saveHotelOffer, deleteHotelOffer, getHolidayPackages, saveHolidayPackage, deleteHolidayPackage, getVisaServices, saveVisaService, deleteVisaService, getPageData, savePageData, getJobs, saveJob, deleteJob, getPressReleases, savePressRelease, deletePressRelease, getBlogPosts, saveBlogPost, deleteBlogPost, getSupportChannels, saveSupportChannels, getDestinations, saveDestination, deleteDestination, getAdminFlights, saveAdminFlight, deleteAdminFlight, getUsers, updateUserRole, updateUserRoleAndPermissions, getPaymentMethodsConfig, savePaymentMethodsConfig, getFeaturesConfig, saveFeaturesConfig, getConsultations, updateConsultationStatus, updateConsultationNotes, getBanners, saveBanner, deleteBanner } from '../services/firebaseService';
 
 interface AdminDashboardProps {
     onLogoUpdate?: (url: string) => void;
@@ -25,16 +29,24 @@ interface AdminDashboardProps {
     isDevRoute?: boolean;
 }
 
-type TabType = 'overview' | 'bookings' | 'flights' | 'destinations' | 'hotels' | 'holidays' | 'visa' | 'pages' | 'careers' | 'press' | 'blog' | 'users' | 'settings' | 'support_channels' | 'payment_methods' | 'profile' | 'machine_control';
+type TabType = 'overview' | 'bookings' | 'banners' | 'flights' | 'destinations' | 'hotels' | 'holidays' | 'visa' | 'pages' | 'careers' | 'press' | 'blog' | 'users' | 'settings' | 'support_channels' | 'payment_methods' | 'profile' | 'machine_control';
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLogo, isDevRoute }) => {
-  const { user, isAdmin, role, permissions, loading, signInWithGoogle, signInWithEmail, logout } = useAuth();
+  const { user, isAdmin, role, permissions, loading, innerAuthError, signInWithGoogle, signInWithEmail, logout } = useAuth();
   const navigate = useNavigate();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState('');
-  const [devClicks, setDevClicks] = useState(0);
+
+  const isAuthorized = user && (isDevRoute ? role === 'developer' : isAdmin);
+
+  useEffect(() => {
+     if (!loading && user && !isAuthorized) {
+         setAuthError((isDevRoute ? "Access Denied: Developer privileges required." : "Access Denied: Admin privileges required.") + (innerAuthError ? ` (Firestore Details: ${innerAuthError})` : ""));
+         logout();
+     }
+  }, [loading, user, isAuthorized, isDevRoute, logout, innerAuthError]);
 
   const handleEmailSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,13 +65,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
   const handleLogout = async () => {
       try {
           await logout();
-          navigate('/');
       } catch(e) {}
   };
   
   const [activeTab, setActiveTab] = useState<TabType>('overview');
-  const [stats, setStats] = useState({ totalBookings: 0, revenue: 0, pending: 0 });
+  const [isNotificationsRead, setIsNotificationsRead] = useState(false);
+  const [lastNotificationCount, setLastNotificationCount] = useState(0);
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [banners, setBanners] = useState<any[]>([]);
   const [hotels, setHotels] = useState<any[]>([]);
   const [holidays, setHolidays] = useState<any[]>([]);
   const [visas, setVisas] = useState<any[]>([]);
@@ -76,17 +89,70 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
       flightsEnabled: true, hotelsEnabled: true, 
       topNavHomeEnabled: true, topNavHotelsEnabled: true, topNavHolidaysEnabled: true, topNavVisaEnabled: true,
       navHomeEnabled: true, navHotelsEnabled: true, navHolidaysEnabled: true, navVisaEnabled: true });
+  const [uploadConfig, setUploadConfig] = useState<any>({
+      provider: 'cloudinary', cpanelUrl: ''
+  });
   const [selectedPageId, setSelectedPageId] = useState<string>('about');
   const [aboutUsData, setAboutUsData] = useState<any>({title: '', content: '', imageUrl: ''});
   const [supportData, setSupportData] = useState<any>({ address: '', phone: '', email: '', socials: [] });
   const [isSidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 1024);
   const [confirmOptions, setConfirmOptions] = useState<{isOpen: boolean, title: string, message: string, onConfirm: () => void} | null>(null);
 
+  const [newStaffEmail, setNewStaffEmail] = useState('');
+  const [newStaffPassword, setNewStaffPassword] = useState('');
+  const [newStaffRole, setNewStaffRole] = useState('admin');
+  const [isAddingStaff, setIsAddingStaff] = useState(false);
+  const [isAddingStaffModalOpen, setIsAddingStaffModalOpen] = useState(false);
+
   const confirmAction = (title: string, message: string, onConfirm: () => void) => {
       setConfirmOptions({ isOpen: true, title, message, onConfirm: () => {
           onConfirm();
           setConfirmOptions(null);
       }});
+  };
+
+  const handleAddStaff = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!newStaffEmail || !newStaffPassword || !newStaffRole) {
+          toast.error('Please fill in all fields');
+          return;
+      }
+      setIsAddingStaff(true);
+      const toastId = toast.loading('Creating account...');
+      try {
+          const apps = getApps();
+          const existingApp = apps.find(a => a.name === 'SecondaryAuthApp');
+          const secondaryApp = existingApp || initializeApp(firebaseConfig, 'SecondaryAuthApp');
+          const secondaryAuth = getSecondaryAuth(secondaryApp);
+          const userCredential = await secondaryCreateUser(secondaryAuth, newStaffEmail, newStaffPassword);
+          const newUid = userCredential.user.uid;
+          await secondaryAuth.signOut();
+
+          await setDoc(doc(db, 'users', newUid), {
+              email: newStaffEmail.toLowerCase(),
+              role: newStaffRole,
+              createdAt: serverTimestamp(),
+              permissions: []
+          });
+
+          setUsersList(prev => [...prev, {
+              id: newUid,
+              email: newStaffEmail.toLowerCase(),
+              role: newStaffRole,
+              permissions: []
+          }]);
+
+          toast.success('Staff account created successfully', { id: toastId });
+          setNewStaffEmail('');
+          setNewStaffPassword('');
+          setNewStaffRole('admin');
+          setIsAddingStaffModalOpen(false);
+      } catch (err: any) {
+          console.error("Failed to create staff account:", err);
+          toast.error(err.message || 'Failed to create account', { id: toastId });
+      } finally {
+          setIsAddingStaff(false);
+      }
   };
   
   useEffect(() => {
@@ -107,7 +173,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
   const [siteName, setSiteName] = useState('HQ Travels & Tours');
 
   const [isModalOpen, setModalOpen] = useState(false);
-  const [modalType, setModalType] = useState<'hotel'|'holiday'|'visa'|'career'|'press'|'blog'|'destination'|'flight'|'modules'|'navbar'|null>(null);
+  const [modalType, setModalType] = useState<'hotel'|'holiday'|'visa'|'career'|'press'|'blog'|'destination'|'flight'|'modules'|'navbar'|'banner'|null>(null);
   const [formData, setFormData] = useState<any>({});
   
   const [isConsultationModalOpen, setConsultationModalOpen] = useState(false);
@@ -134,9 +200,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
       getFeaturesConfig().then(data => {
           if (data) setFeaturesConfig(data);
       });
+      getUploadConfig().then(data => {
+          if (data) setUploadConfig(data);
+      });
   }, [isAdmin]);
 
-  const openModal = (type: 'hotel'|'holiday'|'visa'|'career'|'press'|'blog'|'destination'|'flight', data?: any) => {
+  const openModal = (type: 'hotel'|'holiday'|'visa'|'career'|'press'|'blog'|'destination'|'flight'|'banner', data?: any) => {
       setModalType(type);
       if (data) {
           setFormData(data);
@@ -254,6 +323,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
             };
             await saveAdminFlight(id, data);
             setAdminFlights(isEdit ? adminFlights.map(f => f.id === id ? {id, ...data} : f) : [...adminFlights, {id, ...data}]);
+        } else if (modalType === 'banner') {
+            const data = {
+                imageUrl: formData.imageUrl || '',
+                isActive: formData.isActive !== undefined ? formData.isActive : true,
+                order: Number(formData.order) || 0
+            };
+            await saveBanner(id, data);
+            setBanners(isEdit ? banners.map(b => b.id === id ? {id, ...data} : b) : [...banners, {id, ...data}].sort((a,b)=>a.order-b.order));
         } else if (modalType === 'modules' || modalType === 'navbar') {
             await saveFeaturesConfig(featuresConfig);
             setModalOpen(false);
@@ -271,7 +348,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
     if (!isAdmin) return;
     const fetchData = async () => {
       try {
-        const [b, h, hol, v, p, j, pr, bl, dests, flights, usersData, consultations] = await Promise.all([
+        const [b, h, hol, v, p, j, pr, bl, dests, flights, usersData, consultations, bannersData] = await Promise.all([
             getFirebaseBookings(),
             getHotelOffers(),
             getHolidayPackages(),
@@ -283,7 +360,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
             getDestinations(),
             getAdminFlights(),
             getUsers(),
-            getConsultations()
+            getConsultations(),
+            getBanners()
         ]);
         setBookings(b || []);
         setHotels(h || []);
@@ -297,13 +375,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
         setAdminFlights(flights || []);
         setUsersList(usersData || []);
         setConsultations(consultations || []);
-        const validBookings = b || [];
-        const totalRevenue = validBookings.reduce((sum, booking) => sum + booking.totalAmount, 0);
-        setStats({
-          totalBookings: validBookings.length,
-          revenue: totalRevenue,
-          pending: validBookings.filter(booking => booking.status === 'PENDING').length
-        });
+        setBanners(bannersData || []);
       } catch (err) {
         console.error("Failed to load dashboard data", err);
       }
@@ -315,55 +387,100 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
      return <div className="min-h-screen flex items-center justify-center bg-slate-50"><Loader2 className="w-10 h-10 animate-spin text-primary" /></div>;
   }
 
-  const isAuthorized = user && (isDevRoute ? role === 'developer' : isAdmin);
-  
   if (!isAuthorized) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 font-sans p-4">
-        <div className="max-w-md w-full bg-white p-8 rounded-3xl shadow-xl border border-slate-100 flex flex-col items-center">
-            <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mb-6">
-                <ShieldCheck className="w-10 h-10 text-primary" />
-            </div>
-            <h1 className="text-2xl font-bold text-slate-900 mb-2 font-serif">{isDevRoute ? "Devs Console" : "Admin Portal"}</h1>
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 font-sans p-4 relative overflow-hidden">
+        {/* Background decorations */}
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-100/50 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-100/50 rounded-full blur-3xl pointer-events-none" />
+        
+        <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="max-w-md w-full bg-white/80 backdrop-blur-xl p-10 rounded-3xl shadow-2xl border border-white flex flex-col items-center relative z-10"
+        >
+            <motion.div 
+                initial={{ scale: 0.8 }}
+                animate={{ scale: 1 }}
+                className={`w-20 h-20 rounded-2xl flex items-center justify-center mb-6 shadow-inner ${isDevRoute ? 'bg-indigo-50 text-indigo-600' : 'bg-blue-50 text-blue-600'}`}
+            >
+                {isDevRoute ? <Rocket className="w-10 h-10" /> : <ShieldCheck className="w-10 h-10" />}
+            </motion.div>
+            
+            <h1 className="text-3xl font-extrabold text-slate-900 mb-2 tracking-tight">
+                {isDevRoute ? "Developer Console" : "Admin Portal"}
+            </h1>
             <p className="text-slate-500 text-center mb-8 font-medium">
-              {user ? (isDevRoute && role !== 'developer' ? "You don't have developer privileges." : "You don't have admin privileges.") : "Sign in to access the control panel."}
+              Securely authenticate to manage the platform.
             </p>
-            {user ? (
-               <button onClick={handleLogout} className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 px-4 rounded-xl transition">Sign Out</button>
-            ) : isDevRoute ? (
-                <div className="w-full text-center">
-                    <button onClick={signInWithGoogle} className="w-full bg-white border border-slate-200 hover:bg-slate-50 text-slate-900 font-bold py-3 px-4 rounded-xl transition flex items-center justify-center">
-                        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5 mr-3" />
-                        Sign in as Developer
+            
+            <div className="w-full space-y-5">
+                {authError && (
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="p-4 bg-red-50/80 border border-red-100 rounded-2xl flex items-start gap-3 backdrop-blur-sm">
+                        <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                        <p className="text-red-700 text-sm font-semibold">{authError}</p>
+                    </motion.div>
+                )}
+
+                <form onSubmit={handleEmailSignIn} className="space-y-4">
+                    <div className="space-y-1.5">
+                        <label className="block text-sm font-bold text-slate-700">Email Address</label>
+                        <div className="relative">
+                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                            <input
+                                type="email"
+                                placeholder="name@domain.com"
+                                className="w-full pl-12 pr-4 py-3.5 rounded-2xl border border-slate-200 focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition bg-white"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                required
+                            />
+                        </div>
+                    </div>
+                    
+                    <div className="space-y-1.5">
+                        <label className="block text-sm font-bold text-slate-700">Password</label>
+                        <div className="relative">
+                            <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                            <input
+                                type="password"
+                                placeholder="••••••••"
+                                className="w-full pl-12 pr-4 py-3.5 rounded-2xl border border-slate-200 focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition bg-white"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                required
+                            />
+                        </div>
+                    </div>
+
+                    <button 
+                        type="submit" 
+                        disabled={loading}
+                        className={`w-full text-white font-bold py-4 px-4 rounded-2xl transition-all shadow-lg mt-2 flex justify-center items-center gap-2 ${isDevRoute ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/30 hover:shadow-indigo-600/50' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/30 hover:shadow-blue-600/50'}`}
+                    >
+                        {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Log In Securely'}
                     </button>
+                </form>
+                
+                <div className="relative py-4">
+                    <div className="absolute inset-0 flex items-center">
+                        <div className="w-full border-t border-slate-200"></div>
+                    </div>
+                    <div className="relative flex justify-center text-sm">
+                        <span className="px-4 bg-white text-slate-400 font-medium">Or continue with</span>
+                    </div>
                 </div>
-            ) : (
-                <div className="w-full">
-                    <form onSubmit={handleEmailSignIn} className="flex flex-col gap-4 mb-6">
-                        <input
-                            type="email"
-                            placeholder="Email address"
-                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            required
-                        />
-                        <input
-                            type="password"
-                            placeholder="Password"
-                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            required
-                        />
-                        {authError && <p className="text-red-500 text-sm font-medium">{authError}</p>}
-                        <button type="submit" className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 px-4 rounded-xl transition">
-                            Sign In
-                        </button>
-                    </form>
-                </div>
-            )}
-        </div>
+
+                <button 
+                    type="button" 
+                    onClick={signInWithGoogle} 
+                    className="w-full bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700 font-bold py-3.5 px-4 rounded-2xl transition-all flex items-center justify-center gap-3 shadow-sm hover:shadow-md"
+                >
+                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
+                    Sign in with Google
+                </button>
+            </div>
+        </motion.div>
       </div>
     );
   }
@@ -473,10 +590,24 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
   const pendingConsultationsCount = consultations.filter(c => !c.status || c.status === 'pending').length;
   const pendingBookingsCount = bookings.filter(b => b.status === 'PENDING').length;
   const totalNotifications = pendingConsultationsCount + pendingBookingsCount;
+  
+  useEffect(() => {
+      if (totalNotifications > lastNotificationCount) {
+          setIsNotificationsRead(false);
+      }
+      setLastNotificationCount(totalNotifications);
+  }, [totalNotifications]);
+
+  const displayNotificationCount = isNotificationsRead ? 0 : totalNotifications;
+  
+  const totalBookingsCount = bookings.length;
+  const totalRevenue = bookings.reduce((sum, b) => sum + (b.totalAmount || 0), 0);
+  const activeUsersCount = usersList.length;
 
   const ALL_TABS = [
       { id: 'overview', label: 'Dashboard', icon: LayoutDashboard },
       { id: 'bookings', label: 'Consultations & Bookings', icon: Ticket },
+      { id: 'banners', label: 'Banners & Slides', icon: ImageIcon },
       { id: 'flights', label: 'Flight Inventory', icon: Plane },
       { id: 'destinations', label: 'Destinations', icon: ImageIcon },
       { id: 'hotels', label: 'Hotel Partners', icon: BedDouble },
@@ -523,7 +654,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
                                 <span className="text-slate-500 font-medium tracking-wide text-sm uppercase">Total Revenue</span>
                                 <div className="p-2 bg-green-50 text-green-600 rounded-lg"><DollarSign className="w-5 h-5" /></div>
                             </div>
-                            <div className="text-4xl font-bold text-slate-900 relative z-10 font-serif">${stats.revenue.toLocaleString()}</div>
+                            <div className="text-4xl font-bold text-slate-900 relative z-10 font-serif">${totalRevenue.toLocaleString()}</div>
                             <div className="mt-3 text-sm font-bold text-green-600 flex items-center bg-green-50 w-fit px-2 py-1 rounded-md"><ChevronRight className="w-4 h-4 mr-0.5 -rotate-45" /> +14.5%</div>
                         </div>
                         
@@ -535,7 +666,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
                                 <span className="text-slate-500 font-medium tracking-wide text-sm uppercase">Total Bookings</span>
                                 <div className="p-2 bg-blue-50 text-primary rounded-lg"><Ticket className="w-5 h-5" /></div>
                             </div>
-                            <div className="text-4xl font-bold text-slate-900 relative z-10 font-serif">{stats.totalBookings}</div>
+                            <div className="text-4xl font-bold text-slate-900 relative z-10 font-serif">{totalBookingsCount}</div>
                             <div className="mt-3 text-sm font-bold text-green-600 flex items-center bg-green-50 w-fit px-2 py-1 rounded-md"><ChevronRight className="w-4 h-4 mr-0.5 -rotate-45" /> +5.2%</div>
                         </div>
 
@@ -547,7 +678,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
                                 <span className="text-slate-500 font-medium tracking-wide text-sm uppercase">Active Users</span>
                                 <div className="p-2 bg-orange-50 text-orange-600 rounded-lg"><Users className="w-5 h-5" /></div>
                             </div>
-                            <div className="text-4xl font-bold text-slate-900 relative z-10 font-serif">1,204</div>
+                            <div className="text-4xl font-bold text-slate-900 relative z-10 font-serif">{activeUsersCount.toLocaleString()}</div>
                             <div className="mt-3 text-sm font-bold text-slate-500 flex items-center bg-slate-50 w-fit px-2 py-1 rounded-md text-nowrap">Across all platforms</div>
                         </div>
 
@@ -556,8 +687,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
                                 <span className="text-slate-500 font-medium tracking-wide text-sm uppercase">Pending Approvals</span>
                                 <div className="p-2 bg-red-50 text-red-600 rounded-lg"><Loader2 className="w-5 h-5 animate-spin" /></div>
                             </div>
-                            <div className="text-4xl font-bold text-slate-900 relative z-10 font-serif">{stats.pending || 3}</div>
-                            <div className="mt-3 text-sm font-bold text-red-600 flex items-center bg-red-50 w-fit px-2 py-1 rounded-md text-nowrap">Requires attention</div>
+                            <div className="text-4xl font-bold text-slate-900 relative z-10 font-serif">{totalNotifications}</div>
+                            <div className="mt-3 text-sm font-bold flex items-center w-fit px-2 py-1 rounded-md text-nowrap transition-colors duration-300
+                                {totalNotifications > 0 ? 'text-red-600 bg-red-50' : 'text-green-600 bg-green-50'}">
+                                {totalNotifications > 0 ? 'Requires attention' : 'All caught up'}
+                            </div>
                         </div>
                       </div>
 
@@ -598,18 +732,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
                                 <h3 className="text-xl font-bold text-slate-900">Recent Activity</h3>
                             </div>
                             <div className="space-y-6 flex-1 overflow-y-auto pr-2">
-                                {[1,2,3,4,5].map((_, i) => (
-                                    <div key={i} className="flex items-start group">
-                                        <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-primary shrink-0 mr-4 group-hover:bg-primary group-hover:text-white transition-colors duration-300">
-                                            <Ticket className="w-5 h-5" />
+                                {bookings.slice(0, 5).map((booking, i) => (
+                                    <div key={booking.id || i} className="flex items-start group">
+                                        <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-primary shrink-0 mr-4 group-hover:bg-primary group-hover:text-white transition-colors duration-300 cursor-pointer" onClick={() => setActiveTab('bookings')}>
+                                            {booking.type === 'package' ? <Palmtree className="w-5 h-5" /> : booking.type === 'visa' ? <FileText className="w-5 h-5" /> : <Ticket className="w-5 h-5" />}
                                         </div>
                                         <div className="pb-4 border-b border-slate-50 w-full group-last:border-0 group-last:pb-0">
-                                            <p className="text-sm font-bold text-slate-900 leading-tight">New Booking <span className="text-primary cursor-pointer hover:underline">#BK-{2049 + i}</span></p>
-                                            <p className="text-xs text-slate-500 mt-1 font-medium">Flight from DAC to DXB passenger added.</p>
-                                            <p className="text-[11px] font-bold text-slate-400 mt-2 uppercase tracking-wider">{i * 2 + 1} hours ago</p>
+                                            <p className="text-sm font-bold text-slate-900 leading-tight">New {booking.type} Booking <span className="text-primary cursor-pointer hover:underline" onClick={() => setActiveTab('bookings')}>#{booking.id.slice(0, 6)}</span></p>
+                                            <p className="text-xs text-slate-500 mt-1 font-medium">{booking.passengerDetails?.[0]?.firstName} {booking.passengerDetails?.[0]?.lastName}</p>
+                                            <p className="text-[11px] font-bold text-slate-400 mt-2 uppercase tracking-wider">
+                                                {new Date((booking as any).createdAt?.seconds ? (booking as any).createdAt.seconds * 1000 : Date.now()).toLocaleDateString()}
+                                            </p>
                                         </div>
                                     </div>
                                 ))}
+                                {bookings.length === 0 && <p className="text-sm text-slate-500 text-center py-4">No recent bookings</p>}
                             </div>
                         </div>
                       </div>
@@ -1353,6 +1490,49 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
                       </div>
                   </motion.div>
               );
+          case 'banners':
+              return (
+                  <motion.div initial={{opacity: 0, y: 20}} animate={{opacity: 1, y: 0}} className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                      <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between bg-slate-50/50">
+                          <div>
+                              <h2 className="text-xl font-bold text-slate-900">Banners & Slides</h2>
+                              <p className="text-sm text-slate-500 mt-1">Manage image slides that appear on the homepage.</p>
+                          </div>
+                          <button onClick={() => openModal('banner')} className="bg-primary hover:bg-primary/90 text-white font-bold py-2.5 px-5 rounded-xl transition flex items-center shadow-sm">
+                              <Plus className="w-5 h-5 mr-2" /> Add Banner
+                          </button>
+                      </div>
+                      <div className="p-6">
+                            {banners.sort((a,b) => a.order - b.order).map(b => (
+                                <div key={b.id} className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center bg-slate-50 p-4 rounded-xl border border-slate-100 mb-4">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-24 h-16 bg-slate-200 rounded-lg overflow-hidden shrink-0">
+                                            {b.imageUrl ? <img src={b.imageUrl} alt="Banner" className="w-full h-full object-cover" /> : <ImageIcon className="w-6 h-6 text-slate-400 m-auto mt-5" />}
+                                        </div>
+                                        <div>
+                                            <h4 className="font-bold text-slate-900">Banner Image</h4>
+                                            <p className="text-sm text-slate-500">Order: {b.order} | Status: <span className={b.isActive ? "text-green-600 font-medium" : "text-slate-400"}>{b.isActive ? "Active" : "Inactive"}</span></p>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-2 w-full md:w-auto mt-2 md:mt-0">
+                                        <button onClick={() => openModal('banner', b)} className="flex-1 md:flex-none text-blue-500 font-bold text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition text-center">Edit</button>
+                                        <button onClick={async () => {
+                                            confirmAction('Delete Banner', 'Are you sure you want to delete this banner?', async () => {
+                                                const toastId = toast.loading('Deleting...');
+                                                try {
+                                                    await deleteBanner(b.id);
+                                                    setBanners(banners.filter(ban => ban.id !== b.id));
+                                                    toast.success('Deleted', {id: toastId});
+                                                } catch(err) { toast.error('Failed to delete', {id: toastId}); }
+                                            });
+                                        }} className="flex-1 md:flex-none text-red-500 font-bold text-sm bg-red-50 px-4 py-2 rounded-lg hover:bg-red-100 transition text-center">Delete</button>
+                                    </div>
+                                </div>
+                            ))}
+                            {banners.length === 0 && <div className="text-center py-12 text-slate-500">No banners added yet.</div>}
+                      </div>
+                  </motion.div>
+              );
           case 'blog':
               return (
                   <motion.div initial={{opacity: 0, y: 20}} animate={{opacity: 1, y: 0}} className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
@@ -1398,19 +1578,28 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
                               <h2 className="text-xl font-bold text-slate-900">User & Admin Management</h2>
                               <p className="text-sm font-medium text-slate-500 mt-1">Manage users, adjust roles, and set specific permissions for moderators.</p>
                           </div>
+                          {(role === 'developer' || role === 'super_admin' || role === 'admin') && (
+                              <button
+                                  onClick={() => setIsAddingStaffModalOpen(true)}
+                                  className="bg-primary hover:bg-primary/90 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center transition disabled:opacity-50"
+                              >
+                                  <Plus className="w-5 h-5 mr-2" /> Add Staff / Admin
+                              </button>
+                          )}
                       </div>
-                      <div className="p-6 space-y-4">
-                            {usersList.map((u: any) => (
+                      <div className="p-6 space-y-6">
+                            <div className="space-y-4">
+                            {usersList.filter((u: any) => role === 'developer' || u.role !== 'developer').map((u: any) => (
                                 <div key={u.id} className="bg-slate-50 p-4 font-sans rounded-xl border border-slate-200">
                                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                                         <div>
                                             <h4 className="font-bold text-slate-900 text-lg">{u.email}</h4>
-                                            <p className="text-sm text-slate-500 capitalize">Role: <span className="font-bold text-primary">{u.role || 'user'}</span></p>
+                                            <p className="text-sm text-slate-500 capitalize">Role: <span className="font-bold text-primary">{u.role === 'user' || !u.role ? 'Customer' : u.role}</span></p>
                                         </div>
                                         <div className="flex flex-wrap gap-2 items-center">
                                             <select 
                                                 className="bg-white border text-sm font-medium border-slate-300 text-slate-700 rounded-lg px-3 py-2 outline-none focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                                                value={u.role || 'user'}
+                                                value={u.role === 'user' || !u.role ? '' : u.role}
                                                 disabled={u.role === 'developer' && role !== 'developer'}
                                                 onChange={async (e) => {
                                                     const newRole = e.target.value;
@@ -1418,21 +1607,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
                                                         toast.error("You cannot change your own role here.");
                                                         return;
                                                     }
-                                                    confirmAction('Change Role', `Are you sure you want to change ${u.email}'s role to ${newRole}?`, async () => {
+                                                    confirmAction('Change Role', `Are you sure you want to change ${u.email}'s role to ${newRole === '' ? 'Customer' : newRole}?`, async () => {
                                                         const toastId = toast.loading('Updating role...');
                                                         try {
-                                                            await updateUserRoleAndPermissions(u.id, newRole, u.permissions || []);
-                                                            setUsersList(usersList.map(usr => usr.id === u.id ? {...usr, role: newRole} : usr));
+                                                            await updateUserRoleAndPermissions(u.id, newRole === '' ? 'user' : newRole, u.permissions || []);
+                                                            setUsersList(usersList.map(usr => usr.id === u.id ? {...usr, role: newRole === '' ? 'user' : newRole} : usr));
                                                             toast.success('Role updated', { id: toastId });
                                                         } catch(err) { toast.error('Failed to update', { id: toastId }); }
                                                     });
                                                 }}
                                             >
-                                                <option value="user">User</option>
-                                                <option value="moderator">Moderator</option>
+                                                <option value="" disabled>Select Role</option>
+                                                <option value="moderator">Mod</option>
                                                 <option value="manager">Manager</option>
-                                                {(role === 'developer' || role === 'super_admin' || role === 'admin' || u.role === 'admin' || u.role === 'super_admin') && <option value="super_admin">Super Admin</option>}
-                                                {role === 'developer' && <option value="developer">Developer</option>}
+                                                {(role === 'developer' || role === 'super_admin' || u.role === 'super_admin') && <option value="super_admin">Super Admin</option>}
+                                                {role === 'developer' && <option value="developer">Dev</option>}
                                             </select>
                                         </div>
                                     </div>
@@ -1473,6 +1662,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
                                     )}
                                 </div>
                             ))}
+                            </div>
                       </div>
                   </motion.div>
               );
@@ -1595,6 +1785,69 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
                         </div>
 
                         <div className="p-6 md:p-8">
+                            <div className="bg-slate-50 rounded-xl p-6 border border-slate-200 mb-6">
+                                <h3 className="text-lg font-bold text-slate-900 mb-4">Image Upload System (Storage)</h3>
+                                <div className="space-y-4">
+                                    <div className="bg-white border text-sm font-medium border-slate-300 rounded-lg outline-none flex">
+                                        <div className="flex-1 flex items-center px-4 py-3 border-r border-slate-300">
+                                            <input type="radio" id="upload-cloudinary" 
+                                                checked={uploadConfig.provider === 'cloudinary'}
+                                                onChange={async () => {
+                                                    const newConfig = {...uploadConfig, provider: 'cloudinary'};
+                                                    setUploadConfig(newConfig);
+                                                    await saveUploadConfig(newConfig);
+                                                    toast.success('Switched to Cloudinary');
+                                                }}
+                                                className="w-4 h-4 text-primary bg-slate-100 border-slate-300 focus:ring-primary mr-3" />
+                                            <label htmlFor="upload-cloudinary" className="font-bold text-slate-700 cursor-pointer">Cloudinary (Default)</label>
+                                        </div>
+                                        <div className="flex-1 flex items-center px-4 py-3">
+                                            <input type="radio" id="upload-cpanel" 
+                                                checked={uploadConfig.provider === 'cpanel'}
+                                                onChange={async () => {
+                                                    const newConfig = {...uploadConfig, provider: 'cpanel'};
+                                                    setUploadConfig(newConfig);
+                                                    await saveUploadConfig(newConfig);
+                                                    toast.success('Switched to cPanel BDIX / Custom PHP');
+                                                }}
+                                                className="w-4 h-4 text-primary bg-slate-100 border-slate-300 focus:ring-primary mr-3" />
+                                            <label htmlFor="upload-cpanel" className="font-bold text-slate-700 cursor-pointer">cPanel / Custom PHP Server</label>
+                                        </div>
+                                    </div>
+
+                                    {uploadConfig.provider === 'cpanel' && (
+                                        <div className="bg-white p-4 border border-slate-200 rounded-xl mt-4 space-y-4">
+                                            <div>
+                                                <label className="block text-sm font-bold text-slate-700 mb-2">cPanel upload.php URL</label>
+                                                <input 
+                                                    type="url" 
+                                                    placeholder="e.g. https://yourdomain.com/upload.php" 
+                                                    value={uploadConfig.cpanelUrl || ''}
+                                                    onChange={async (e) => {
+                                                        const newVal = e.target.value;
+                                                        setUploadConfig({...uploadConfig, cpanelUrl: newVal});
+                                                    }}
+                                                    onBlur={async () => {
+                                                        const toastId = toast.loading('Saving PHP URL...');
+                                                        try {
+                                                            await saveUploadConfig(uploadConfig);
+                                                            toast.success('Saved correctly', {id: toastId});
+                                                        } catch(e) { toast.error('Failed to save', {id: toastId}); }
+                                                    }}
+                                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:border-primary text-slate-700 font-medium text-sm"
+                                                />
+                                            </div>
+                                            <div className="p-4 bg-blue-50 text-blue-800 rounded-xl text-sm font-medium border border-blue-100">
+                                                <p className="font-bold mb-2">Instructions:</p>
+                                                <p>Place your <code className="bg-white px-1 py-0.5 rounded text-blue-600">upload.php</code> script on your hosting server.</p>
+                                                <p>The script should accept a <code className="bg-white px-1 py-0.5 rounded text-blue-600">POST</code> request with a <code className="bg-white px-1 py-0.5 rounded text-blue-600">file</code> form-data parameter.</p>
+                                                <p>It must return JSON: <code className="bg-white px-1 py-0.5 rounded text-blue-600">{`{"success": true, "url": "https://..."}`}</code> on success.</p>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
                             <div className="bg-slate-50 rounded-xl p-6 border border-slate-200">
                                 <div className="flex items-center justify-between mb-4">
                                     <div>
@@ -1776,7 +2029,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
                       <div className="absolute inset-0 bg-white/20 blur group-hover:blur-md transition-all duration-500 opacity-0 group-hover:opacity-100"></div>
                       <Rocket className="w-5 h-5 text-white transform group-hover:scale-110 group-hover:-translate-y-1 group-hover:translate-x-1 transition-all duration-300 relative z-10" />
                   </div>
-                  <span className="font-bold text-xl tracking-wide font-sans truncate bg-clip-text text-transparent bg-gradient-to-r from-white via-blue-100 to-white animate-pulse">Admins Cockpit</span>
+                  <span className="font-bold text-xl tracking-wide font-sans truncate bg-clip-text text-transparent bg-gradient-to-r from-white via-blue-100 to-white animate-pulse">
+                      {role === 'developer' ? 'Dev Console' : 'Admins Cockpit'}
+                  </span>
               </div>
               <button className="lg:hidden text-slate-400 hover:text-white transition" onClick={() => setSidebarOpen(false)}>
                   <X className="w-6 h-6" />
@@ -1852,7 +2107,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
                   <div className="relative">
                       <button onClick={() => setNotificationsOpen(!isNotificationsOpen)} className="relative p-2 text-slate-500 hover:bg-slate-100 hover:text-primary rounded-xl transition-colors">
                           <Bell className="w-6 h-6" />
-                          {totalNotifications > 0 && <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white shadow-sm"></span>}
+                          {displayNotificationCount > 0 && <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white shadow-sm"></span>}
                       </button>
                       <AnimatePresence>
                           {isNotificationsOpen && (
@@ -1864,12 +2119,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
                               >
                                   <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
                                       <h3 className="font-bold text-slate-800">Notifications</h3>
-                                      {totalNotifications > 0 && (
-                                          <span className="bg-primary text-white text-xs font-bold px-2 py-0.5 rounded-full">{totalNotifications} New</span>
-                                      )}
+                                      <div className="flex items-center gap-2">
+                                          {displayNotificationCount > 0 && (
+                                              <span className="bg-primary text-white text-xs font-bold px-2 py-0.5 rounded-full cursor-pointer hover:bg-primary/90" onClick={() => setIsNotificationsRead(true)}>Mark all read</span>
+                                          )}
+                                      </div>
                                   </div>
                                   <div className="max-h-80 overflow-y-auto">
-                                      {totalNotifications === 0 ? (
+                                      {displayNotificationCount === 0 ? (
                                           <div className="p-6 text-center text-slate-500 text-sm font-semibold">
                                               No new notifications.
                                           </div>
@@ -1983,6 +2240,31 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
                                 <div><label className="text-sm font-bold text-slate-700 block mb-1">Date</label><input type="text" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 font-medium" placeholder="Oct 20, 2026" value={formData.date} onChange={e=>setFormData({...formData, date: e.target.value})} /></div>
                                 <div><label className="text-sm font-bold text-slate-700 block mb-1">Link</label><input type="url" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 font-medium" placeholder="https://" value={formData.link} onChange={e=>setFormData({...formData, link: e.target.value})} /></div>
                                 <div><label className="text-sm font-bold text-slate-700 block mb-1">Publisher</label><input type="text" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 font-medium" placeholder="CNN" value={formData.publisher} onChange={e=>setFormData({...formData, publisher: e.target.value})} /></div>
+                            </>
+                        )}
+                        {modalType === 'banner' && (
+                            <>
+                                <div>
+                                    <label className="text-sm font-bold text-slate-700 block mb-1">Banner Image URL</label>
+                                    <div className="flex gap-2">
+                                        <input type="url" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 font-medium" placeholder="https://" value={formData.imageUrl || ''} onChange={e=>setFormData({...formData, imageUrl: e.target.value})} />
+                                        <label className="cursor-pointer bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-2 px-4 rounded-xl flex items-center justify-center transition whitespace-nowrap">
+                                            {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                                            <span className="sr-only">Upload Image</span>
+                                            <input type="file" className="hidden" accept="image/*" onChange={handleModalImageUpload} disabled={uploading} />
+                                        </label>
+                                    </div>
+                                    {formData.imageUrl && (
+                                        <div className="mt-2 h-32 bg-slate-100 rounded-xl overflow-hidden border border-slate-200">
+                                            <img src={formData.imageUrl} className="w-full h-full object-cover" alt="Preview" />
+                                        </div>
+                                    )}
+                                </div>
+                                <div><label className="text-sm font-bold text-slate-700 block mb-1">Display Order</label><input type="number" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 font-medium" placeholder="0" value={formData.order || 0} onChange={e=>setFormData({...formData, order: e.target.value})} /></div>
+                                <div className="flex items-center gap-2 mt-4">
+                                    <input type="checkbox" id="bannerActive" checked={formData.isActive !== false} onChange={e=>setFormData({...formData, isActive: e.target.checked})} className="w-4 h-4 text-primary" />
+                                    <label htmlFor="bannerActive" className="text-sm font-bold text-slate-700">Set as Active</label>
+                                </div>
                             </>
                         )}
                         {modalType === 'blog' && (
@@ -2214,6 +2496,88 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoUpdate, currentLo
             </motion.div>
         )}
       </AnimatePresence>
+
+      <AnimatePresence>
+          {isAddingStaffModalOpen && (
+              <motion.div 
+                  initial={{ opacity: 0 }} 
+                  animate={{ opacity: 1 }} 
+                  exit={{ opacity: 0 }} 
+                  className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+              >
+                  <motion.div 
+                      initial={{ scale: 0.95, opacity: 0 }} 
+                      animate={{ scale: 1, opacity: 1 }} 
+                      exit={{ scale: 0.95, opacity: 0 }} 
+                      className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden"
+                  >
+                      <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                          <div>
+                              <h3 className="text-xl font-bold text-slate-900">Create New Admin/Staff</h3>
+                              <p className="text-sm text-slate-500 mt-1">Add a new privileged account.</p>
+                          </div>
+                      </div>
+                      <div className="p-6">
+                          <form onSubmit={handleAddStaff} className="space-y-4">
+                              <div>
+                                  <label className="block text-sm font-bold text-slate-700 mb-2">Email Address</label>
+                                  <input 
+                                      type="email" 
+                                      placeholder="name@company.com" 
+                                      required
+                                      value={newStaffEmail}
+                                      onChange={(e) => setNewStaffEmail(e.target.value)}
+                                      className="w-full bg-white border border-slate-300 text-slate-700 rounded-xl p-3 outline-none focus:border-primary disabled:opacity-50"
+                                  />
+                              </div>
+                              <div>
+                                  <label className="block text-sm font-bold text-slate-700 mb-2">Secure Password</label>
+                                  <input 
+                                      type="text" 
+                                      placeholder="Min 6 characters" 
+                                      required
+                                      minLength={6}
+                                      value={newStaffPassword}
+                                      onChange={(e) => setNewStaffPassword(e.target.value)}
+                                      className="w-full bg-white border border-slate-300 text-slate-700 rounded-xl p-3 outline-none focus:border-primary disabled:opacity-50"
+                                  />
+                              </div>
+                              <div>
+                                  <label className="block text-sm font-bold text-slate-700 mb-2">Assign Role</label>
+                                  <select 
+                                      value={newStaffRole}
+                                      onChange={(e) => setNewStaffRole(e.target.value)}
+                                      className="w-full bg-white border border-slate-300 text-slate-700 rounded-xl p-3 outline-none focus:border-primary disabled:opacity-50"
+                                  >
+                                      <option value="admin">Admin</option>
+                                      <option value="manager">Manager</option>
+                                      <option value="moderator">Moderator</option>
+                                      {role === 'developer' && <option value="super_admin">Super Admin</option>}
+                                  </select>
+                              </div>
+                              <div className="flex gap-3 pt-4 border-t border-slate-100">
+                                  <button 
+                                      type="button" 
+                                      onClick={() => setIsAddingStaffModalOpen(false)} 
+                                      className="flex-1 px-5 py-3 rounded-xl font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition"
+                                  >
+                                      Cancel
+                                  </button>
+                                  <button 
+                                      type="submit" 
+                                      disabled={isAddingStaff}
+                                      className="flex-1 px-5 py-3 rounded-xl font-bold text-white bg-primary hover:bg-primary/90 transition flex justify-center items-center disabled:opacity-50"
+                                  >
+                                      {isAddingStaff ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Create Account'}
+                                  </button>
+                              </div>
+                          </form>
+                      </div>
+                  </motion.div>
+              </motion.div>
+          )}
+      </AnimatePresence>
+
     </div>
     </>
   );

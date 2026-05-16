@@ -85,6 +85,15 @@ export interface AILiveInsight {
     sources: GroundingSource[];
 }
 
+export interface Banner {
+    id: string;
+    imageUrl: string;
+    title?: string;
+    link?: string;
+    isActive: boolean;
+    order: number;
+}
+
 // Hotelbeds Types
 export interface Hotel {
   code: number;

@@ -6,8 +6,7 @@ import firebaseConfig from './firebase-applet-config.json';
 const app = initializeApp(firebaseConfig);
 export const db = initializeFirestore(app, {
   experimentalForceLongPolling: true
-}, firebaseConfig.firestoreDatabaseId);
-// export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId); // CRITICAL: Database ID
+}, firebaseConfig.firestoreDatabaseId); // CRITICAL: Database ID
 export const auth = getAuth();
 
 async function testConnection() {

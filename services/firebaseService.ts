@@ -422,6 +422,40 @@ export const deletePressRelease = async (id: string) => {
 }
 
 // -- Blog Posts --
+export const getBanners = async () => {
+    const path = 'banners';
+    try {
+        const snapshot = await getDocs(query(collection(db, path), orderBy('order', 'asc')));
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (error) {
+        handleFirestoreError(error, OperationType.LIST, path);
+        return [];
+    }
+};
+export const saveBanner = async (id: string, data: any) => {
+    const path = `banners/${id}`;
+    try {
+        await setDoc(doc(db, 'banners', id), {
+            ...data,
+            isActive: data.isActive !== undefined ? data.isActive : true,
+            order: data.order || 0,
+            createdAt: data.createdAt || serverTimestamp()
+        }, { merge: true });
+    } catch (error) {
+        handleFirestoreError(error, OperationType.WRITE, path);
+        throw error;
+    }
+};
+export const deleteBanner = async (id: string) => {
+    const path = `banners/${id}`;
+    try {
+        await deleteDoc(doc(db, 'banners', id));
+    } catch (error) {
+        handleFirestoreError(error, OperationType.DELETE, path);
+        throw error;
+    }
+};
+
 export const getBlogPosts = async () => {
     const path = 'blogPosts';
     try {
@@ -473,6 +507,33 @@ export const savePaymentMethodsConfig = async (data: any) => {
     const path = 'settings/paymentMethods';
     try {
         await setDoc(doc(db, 'settings', 'paymentMethods'), data);
+    } catch (error) {
+        handleFirestoreError(error, OperationType.WRITE, path);
+        throw error;
+    }
+}
+
+export const getUploadConfig = async () => {
+    const path = 'settings/upload';
+    try {
+        const docSnap = await getDoc(doc(db, 'settings', 'upload'));
+        if (docSnap.exists()) return docSnap.data();
+        return { 
+            provider: 'cloudinary', // 'cloudinary' | 'cpanel'
+            cpanelUrl: '',
+            cloudinaryUrl: 'https://api.cloudinary.com/v1_1/db1a28dd3/image/upload',
+            cloudinaryPreset: 'hq_travel'
+        };
+    } catch (error) {
+        handleFirestoreError(error, OperationType.GET, path);
+        return null;
+    }
+}
+
+export const saveUploadConfig = async (data: any) => {
+    const path = 'settings/upload';
+    try {
+        await setDoc(doc(db, 'settings', 'upload'), data);
     } catch (error) {
         handleFirestoreError(error, OperationType.WRITE, path);
         throw error;

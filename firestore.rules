@@ -13,50 +13,40 @@ service cloud.firestore {
     function isSignedIn() { return request.auth != null; }
     function isAdmin() { 
       return isSignedIn() && (
-        request.auth.token.email == 'aburayhan10x@gmail.com' ||
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) 
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'super_admin', 'manager', 'moderator', 'developer'])
+        ("email" in request.auth.token && request.auth.token.email == 'aburayhan10x@gmail.com') ||
+        (
+          exists(/databases/$(database)/documents/users/$(request.auth.uid)) 
+          && "role" in get(/databases/$(database)/documents/users/$(request.auth.uid)).data
+          && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'super_admin', 'manager', 'moderator', 'developer']
+        )
       ); 
     }
 
     function isSuperAdmin() {
       return isSignedIn() && (
-        request.auth.token.email == 'aburayhan10x@gmail.com' ||
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) 
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'super_admin', 'developer'])
+        ("email" in request.auth.token && request.auth.token.email == 'aburayhan10x@gmail.com') ||
+        (
+          exists(/databases/$(database)/documents/users/$(request.auth.uid)) 
+          && "role" in get(/databases/$(database)/documents/users/$(request.auth.uid)).data
+          && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['super_admin', 'developer']
+        )
       );
     }
     
     function isDeveloper() {
       return isSignedIn() && (
-        request.auth.token.email == 'aburayhan10x@gmail.com' ||
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'developer')
+        ("email" in request.auth.token && request.auth.token.email == 'aburayhan10x@gmail.com') ||
+        (
+          exists(/databases/$(database)/documents/users/$(request.auth.uid)) 
+          && "role" in get(/databases/$(database)/documents/users/$(request.auth.uid)).data
+          && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'developer'
+        )
       );
     }
     
     match /users/{userId} {
-      function isValidUser(data) {
-        return data.keys().hasAll(['email', 'role', 'createdAt'])
-            && data.email is string && data.email.size() <= 200
-            && data.role is string && (data.role in ['user', 'admin', 'super_admin', 'manager', 'moderator', 'developer'])
-            && data.createdAt is timestamp;
-      }
-      
-      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      // Only system creates users securely, or allow user to create profile with 'user' role
-      allow create: if isSignedIn() 
-                    && request.auth.uid == userId 
-                    && isValidUser(incoming())
-                    && incoming().role in ['user', 'super_admin', 'developer']
-                    && incoming().createdAt == request.time;
-      allow update: if isSignedIn() 
-                    && (request.auth.uid == userId || isSuperAdmin())
-                    && isValidUser(incoming())
-                    && (
-                        isDeveloper() || isSuperAdmin() || 
-                        (incoming().role == existing().role && incoming().get('permissions', []) == existing().get('permissions', []))
-                    )
-                    && incoming().createdAt == existing().createdAt;
+      allow read: if true;
+      allow write: if request.auth != null && (request.auth.uid == userId || isAdmin() || isSuperAdmin() || isDeveloper() || ("email" in request.auth.token && request.auth.token.email == 'aburayhan10x@gmail.com'));
     }
 
     match /bookings/{bookingId} {
@@ -181,6 +171,18 @@ service cloud.firestore {
        }
        allow read: if true;
        allow create, update: if isAdmin() && isValidPress(incoming());
+       allow delete: if isAdmin();
+    }
+
+    match /banners/{bannerId} {
+       function isValidBanner(data) {
+           return data.keys().hasAll(['imageUrl', 'isActive', 'order'])
+               && data.imageUrl is string
+               && data.isActive is bool
+               && data.order is number;
+       }
+       allow read: if true;
+       allow create, update: if isAdmin();
        allow delete: if isAdmin();
     }
 
